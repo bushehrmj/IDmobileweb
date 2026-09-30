@@ -65,6 +65,17 @@ function AppContent() {
     users: 'users.view',
     settings: 'settings.view',
     backup: 'backup.create',
+    // Financial pages
+    financial: 'financial.dashboard',
+    cashbank: 'financial.cash',
+    expenses: 'financial.expenses',
+    financialreports: 'financial.reports',
+    chartofaccounts: 'financial.chart_of_accounts',
+    generalledger: 'financial.journal',
+    checks: 'financial.reports',
+    transfers: 'financial.reports',
+    customeraccounts: 'financial.receivables',
+    supplieraccounts: 'financial.payables',
   };
 
   const requiredPermission = pagePermissionMap[currentPage];

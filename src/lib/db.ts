@@ -312,7 +312,23 @@ export function verifyPassword(password: string, hash: string): boolean {
 // Initialize database with default data
 export function initializeDB(): void {
   const initialized = localStorage.getItem(DB_PREFIX + 'initialized');
-  if (initialized) return;
+  if (initialized) {
+    // Migration: Update admin user with new financial permissions
+    const users = getCollection<User>('users');
+    const adminUser = users.find(u => u.username === 'admin');
+    if (adminUser) {
+      const allPerms = getAllPermissions();
+      const missingPerms = allPerms.filter(p => !adminUser.permissions.includes(p));
+      if (missingPerms.length > 0) {
+        adminUser.permissions = allPerms;
+        adminUser.visiblePages = getAllPages();
+        const idx = users.findIndex(u => u.id === adminUser.id);
+        users[idx] = adminUser;
+        setCollection('users', users);
+      }
+    }
+    return;
+  }
 
   // Default admin user
   const adminUser: User = {
@@ -394,17 +410,23 @@ export function getAllPermissions(): string[] {
     'users.view', 'users.create', 'users.edit', 'users.disable',
     'settings.view', 'settings.edit',
     'backup.create', 'backup.restore',
+    // Financial permissions
+    'financial.view', 'financial.dashboard', 'financial.cash', 'financial.bank',
+    'financial.receivables', 'financial.payables', 'financial.expenses',
+    'financial.reports', 'financial.profit', 'financial.balance_sheet',
+    'financial.journal', 'financial.chart_of_accounts', 'financial.reconciliation',
+    'financial.close_period', 'financial.export', 'financial.audit',
   ];
 }
 
 export function getAllPages(): string[] {
-  return ['dashboard', 'sales', 'invoices', 'proformas', 'customers', 'products', 'inventory', 'purchases', 'suppliers', 'repairs', 'payments', 'reports', 'users', 'settings', 'backup'];
+  return ['dashboard', 'sales', 'invoices', 'proformas', 'customers', 'products', 'inventory', 'purchases', 'suppliers', 'repairs', 'payments', 'reports', 'users', 'settings', 'backup', 'financial', 'cashbank', 'expenses', 'financialreports', 'chartofaccounts', 'generalledger', 'checks', 'transfers', 'customeraccounts', 'supplieraccounts'];
 }
 
 export function getRolePermissions(role: string): string[] {
   switch (role) {
     case 'admin': return getAllPermissions();
-    case 'manager': return getAllPermissions().filter(p => !p.startsWith('backup.'));
+    case 'manager': return getAllPermissions().filter(p => !p.startsWith('backup.') && !p.startsWith('financial.close_period'));
     case 'seller': return [
       'dashboard.view', 'sales.view', 'sales.create', 'sales.edit', 'sales.print', 'sales.discount',
       'customers.view', 'customers.create', 'customers.edit',
