@@ -312,21 +312,30 @@ export function verifyPassword(password: string, hash: string): boolean {
 // Initialize database with default data
 export function initializeDB(): void {
   const initialized = localStorage.getItem(DB_PREFIX + 'initialized');
-  if (initialized) {
-    // Migration: Update admin user with new financial permissions
-    const users = getCollection<User>('users');
-    const adminUser = users.find(u => u.username === 'admin');
-    if (adminUser) {
-      const allPerms = getAllPermissions();
-      const missingPerms = allPerms.filter(p => !adminUser.permissions.includes(p));
-      if (missingPerms.length > 0) {
-        adminUser.permissions = allPerms;
-        adminUser.visiblePages = getAllPages();
-        const idx = users.findIndex(u => u.id === adminUser.id);
-        users[idx] = adminUser;
-        setCollection('users', users);
+  
+  // Always run migration to update permissions
+  const users = getCollection<User>('users');
+  if (users.length > 0) {
+    let updated = false;
+    users.forEach(user => {
+      const rolePerms = getRolePermissions(user.role);
+      const rolePages = getRolePages(user.role);
+      const missingPerms = rolePerms.filter(p => !user.permissions.includes(p));
+      const missingPages = rolePages.filter(p => !user.visiblePages.includes(p));
+      
+      if (missingPerms.length > 0 || missingPages.length > 0) {
+        user.permissions = rolePerms;
+        user.visiblePages = rolePages;
+        updated = true;
       }
+    });
+    
+    if (updated) {
+      setCollection('users', users);
     }
+  }
+  
+  if (initialized) {
     return;
   }
 

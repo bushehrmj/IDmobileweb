@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { db, hashPassword, verifyPassword, User, Session, type Settings } from './db';
+import { db, hashPassword, verifyPassword, User, Session, type Settings, getRolePermissions, getRolePages } from './db';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AuthState {
@@ -81,6 +81,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Auto-refresh user data on mount to get latest permissions
+  useEffect(() => {
+    if (authState.user) {
+      const freshUser = db.getUser(authState.user.id);
+      if (freshUser && freshUser.active) {
+        setAuthState(prev => ({ ...prev, user: freshUser }));
+      }
+    }
+  }, []);
+
   const login = useCallback((username: string, password: string) => {
     // Check lock
     const attempt = db.getLoginAttempt(username);
@@ -128,6 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     db.saveSession(session);
     sessionStorage.setItem('idmobile_session', session.id);
 
+    // Update user permissions based on role (migration)
+    user.permissions = getRolePermissions(user.role);
+    user.visiblePages = getRolePages(user.role);
     user.lastLogin = new Date().toISOString();
     db.saveUser(user);
 

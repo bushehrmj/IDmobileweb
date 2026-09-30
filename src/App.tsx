@@ -33,7 +33,7 @@ initializeDB();
 initializeFinancialDB();
 
 function AppContent() {
-  const { isAuthenticated, hasPermission, canViewPage } = useAuth();
+  const { isAuthenticated, hasPermission, canViewPage, refreshUser } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
 
   // Apply theme
@@ -43,6 +43,13 @@ function AppContent() {
       document.documentElement.classList.add('dark');
     }
   }, []);
+
+  // Refresh user data on mount to get latest permissions
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshUser();
+    }
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return <Login />;
