@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth, useToast } from '../lib/auth';
 import { db, type Settings } from '../lib/db';
-import { Save, Lock, Wifi, QrCode } from 'lucide-react';
+import { Save, Lock, Wifi, QrCode, FileText } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, hasPermission, changePassword } = useAuth();
@@ -19,8 +19,6 @@ export default function SettingsPage() {
     showToast('success', 'تنظیمات ذخیره شد');
   };
 
-  // Password change handled via auth context
-
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -33,7 +31,7 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: 'store', label: 'فروشگاه', show: true },
-    { id: 'invoice', label: 'تنظیمات فاکتور', show: true },
+    { id: 'invoice', label: 'فاکتور', show: true },
     { id: 'security', label: 'امنیت', show: hasPermission('settings.edit') },
     { id: 'network', label: 'شبکه', show: hasPermission('settings.view') },
     { id: 'logs', label: 'لاگ‌ها', show: hasPermission('settings.view') },
@@ -106,19 +104,10 @@ export default function SettingsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-500">سایز چاپ</label>
-              <select value={settings.paperSize} onChange={e => setSettings({ ...settings, paperSize: e.target.value as Settings['paperSize'] })}
-                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700">
-                <option value="80mm">80mm</option>
-                <option value="a5">A5</option>
-                <option value="a4">A4</option>
-              </select>
+              <label className="text-xs text-slate-500">درصد سود پیش‌فرض</label>
+              <input type="number" value={settings.defaultProfitPercent} onChange={e => setSettings({ ...settings, defaultProfitPercent: Number(e.target.value) })}
+                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
             </div>
-          </div>
-          <div>
-            <label className="text-xs text-slate-500">درصد سود پیش‌فرض</label>
-            <input type="number" value={settings.defaultProfitPercent} onChange={e => setSettings({ ...settings, defaultProfitPercent: Number(e.target.value) })}
-              className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
           </div>
           <button onClick={save} className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium flex items-center justify-center gap-2">
             <Save size={16} /> ذخیره تنظیمات
@@ -128,10 +117,14 @@ export default function SettingsPage() {
 
       {activeTab === 'invoice' && (
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 space-y-4">
-          <h3 className="font-bold text-sm border-b border-slate-200 dark:border-slate-700 pb-2">شماره‌گذاری</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <FileText size={18} className="text-blue-500" />
+            <h3 className="font-bold">تنظیمات فاکتور</h3>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-slate-500">شروع شماره فاکتور فروش</label>
+              <label className="text-xs text-slate-500">شروع شماره فاکتور</label>
               <input type="number" value={settings.invoiceStartNumber} onChange={e => setSettings({ ...settings, invoiceStartNumber: Number(e.target.value) })}
                 className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
             </div>
@@ -142,39 +135,63 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <h3 className="font-bold text-sm border-b border-slate-200 dark:border-slate-700 pb-2 pt-2">چاپ فاکتور</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-slate-500">سایز کاغذ</label>
-              <select value={settings.paperSize} onChange={e => setSettings({ ...settings, paperSize: e.target.value as Settings['paperSize'] })}
-                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700">
-                <option value="80mm">80mm (رسید حرارتی)</option>
-                <option value="a5">A5</option>
-                <option value="a4">A4</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-slate-500">درصد مالیات (%)</label>
-              <input type="number" value={settings.taxRate} onChange={e => setSettings({ ...settings, taxRate: Number(e.target.value) })}
-                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-            </div>
-          </div>
-
-          <h3 className="font-bold text-sm border-b border-slate-200 dark:border-slate-700 pb-2 pt-2">متن فاکتور</h3>
           <div>
-            <label className="text-xs text-slate-500">پیام پایین فاکتور</label>
-            <textarea value={settings.storeDescription} onChange={e => setSettings({ ...settings, storeDescription: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" rows={3}
-              placeholder="مثلاً: از خرید شما متشکریم - گارانتی 7 روزه" />
+            <label className="text-xs text-slate-500">سایز چاپ فاکتور</label>
+            <select value={settings.paperSize} onChange={e => setSettings({ ...settings, paperSize: e.target.value as Settings['paperSize'] })}
+              className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700">
+              <option value="80mm">80mm (رسید حرارتی)</option>
+              <option value="a5">A5</option>
+              <option value="a4">A4</option>
+            </select>
           </div>
 
-          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-xs text-blue-700 dark:text-blue-300">
-            <p className="font-bold mb-1">💡 راهنما:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>سایز 80mm برای چاپگر حرارتی مناسب است</li>
-              <li>سایز A5 و A4 برای فاکتورهای رسمی</li>
-              <li>پیام پایین فاکتور در تمام فاکتورها نمایش داده می‌شود</li>
-            </ul>
+          <div>
+            <label className="text-xs text-slate-500">سایز چاپ رسید تعمیر</label>
+            <select value={settings.receiptPaperSize} onChange={e => setSettings({ ...settings, receiptPaperSize: e.target.value as Settings['paperSize'] })}
+              className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700">
+              <option value="80mm">80mm (رسید حرارتی)</option>
+              <option value="a5">A5</option>
+              <option value="a4">A4</option>
+            </select>
+          </div>
+
+          <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
+            <p className="text-sm font-bold mb-2">نمایش در فاکتور</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: 'showLogoOnInvoice', label: 'لوگو' },
+                { key: 'showStorePhone', label: 'تلفن فروشگاه' },
+                { key: 'showStoreAddress', label: 'آدرس فروشگاه' },
+                { key: 'showCustomerInfo', label: 'اطلاعات مشتری' },
+                { key: 'showSellerName', label: 'نام فروشنده' },
+                { key: 'showIMEI', label: 'IMEI' },
+                { key: 'showBarcode', label: 'بارکد' },
+                { key: 'showTax', label: 'مالیات' },
+                { key: 'showDiscount', label: 'تخفیف' },
+                { key: 'showNotes', label: 'یادداشت' },
+                { key: 'showFooter', label: 'پاورقی' },
+                { key: 'showProfitOnInvoice', label: 'سود (فقط مدیر)' },
+              ].map(opt => (
+                <label key={opt.key} className="flex items-center gap-2 text-xs bg-slate-50 dark:bg-slate-700/50 p-2 rounded">
+                  <input type="checkbox" checked={Boolean((settings as unknown as Record<string, unknown>)[opt.key])}
+                    onChange={e => setSettings({ ...settings, [opt.key]: e.target.checked } as Settings)} className="rounded" />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500">متن بالای فاکتور</label>
+            <input type="text" value={settings.invoiceHeaderNote} onChange={e => setSettings({ ...settings, invoiceHeaderNote: e.target.value })}
+              className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700"
+              placeholder="مثلاً: کالای فروخته شده پس گرفته نمی‌شود" />
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-500">متن پایین فاکتور</label>
+            <input type="text" value={settings.invoiceFooterText} onChange={e => setSettings({ ...settings, invoiceFooterText: e.target.value })}
+              className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
           </div>
 
           <button onClick={save} className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium">ذخیره تنظیمات فاکتور</button>
@@ -225,7 +242,6 @@ export default function SettingsPage() {
           <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-center">
             <QrCode size={80} className="mx-auto text-slate-400 mb-2" />
             <p className="text-xs text-slate-500">QR Code برای اتصال موبایل</p>
-            <p className="text-xs text-slate-400 mt-1">دوربین موبایل را روی این کد بگیرید</p>
           </div>
         </div>
       )}

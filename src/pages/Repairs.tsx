@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, useToast, formatCurrency, toJalali } from '../lib/auth';
 import { db, type Repair, type RepairPart } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Search, Edit, X, Wrench, Printer, FileText } from 'lucide-react';
+import { Plus, Search, Edit, X, Wrench, Printer } from 'lucide-react';
+import RepairPrint from '../components/RepairPrint';
 
 const statusLabels: Record<string, string> = {
   received: 'دریافت شد', waiting_check: 'در انتظار بررسی', repairing: 'در حال تعمیر',
@@ -27,6 +28,8 @@ export default function Repairs() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editRepair, setEditRepair] = useState<Repair | null>(null);
+  const [printRepairId, setPrintRepairId] = useState<string | null>(null);
+  const [printType, setPrintType] = useState<'receipt' | 'invoice'>('receipt');
 
   const [form, setForm] = useState<Partial<Repair>>({
     customerName: '', customerMobile: '', device: '', brand: '', model: '',
@@ -65,58 +68,51 @@ export default function Repairs() {
     return { partsCost, totalCost };
   };
 
-  const addPart = () => {
-    const choice = confirm('آیا می‌خواهید قطعه را از انبار انتخاب کنید؟\n\nOK = انتخاب از انبار\nCancel = افزودن دستی');
-    
-    if (choice) {
-      // انتخاب از انبار
-      const products = db.getProducts().filter(p => p.category === 'قطعات' && p.stock > 0);
-      if (products.length === 0) {
-        showToast('error', 'قطعه‌ای در انبار وجود ندارد');
-        return;
-      }
-      const name = prompt('نام قطعه را وارد کنید:');
-      if (!name) return;
-      const product = products.find(p => p.name.includes(name));
-      if (!product) {
-        showToast('error', 'قطعه یافت نشد');
-        return;
-      }
-      const qtyStr = prompt('تعداد:', '1');
-      if (!qtyStr) return;
-      const quantity = parseInt(qtyStr) || 1;
-      
+  // افزودن قطعه از انبار
+  const addPartFromStock = () => {
+    const name = prompt('نام قطعه (برای جستجو در انبار):');
+    if (!name) return;
+    const products = db.getProducts();
+    const product = products.find(p => p.name.includes(name) || p.category === 'قطعات');
+    if (product) {
       const part: RepairPart = {
-        id: uuidv4(),
-        productId: product.id,
-        productName: product.name,
-        quantity: quantity,
-        price: product.buyPrice,
-        total: product.buyPrice * quantity,
+        id: uuidv4(), productId: product.id, productName: product.name,
+        quantity: 1, price: product.buyPrice, total: product.buyPrice,
       };
       setForm({ ...form, parts: [...(form.parts || []), part] });
-      showToast('success', `${product.name} (${quantity} عدد) اضافه شد`);
     } else {
-      // افزودن دستی
-      const name = prompt('نام قطعه:');
-      if (!name) return;
-      const qtyStr = prompt('تعداد:', '1');
-      if (!qtyStr) return;
-      const quantity = parseInt(qtyStr) || 1;
-      const priceStr = prompt('قیمت واحد:', '0');
-      if (!priceStr) return;
-      const price = parseInt(priceStr) || 0;
-      
-      const part: RepairPart = {
-        id: uuidv4(),
-        productId: '',
-        productName: name,
-        quantity: quantity,
-        price: price,
-        total: price * quantity,
+      addPartManual();
+    }
+  };
+
+  // افزودن قطعه دستی
+  const addPartManual = () => {
+    const name = prompt('نام قطعه:');
+    if (!name) return;
+    const qtyStr = prompt('تعداد:', '1');
+    const qty = parseInt(qtyStr || '1') || 1;
+    const priceStr = prompt('قیمت واحد (تومان):', '0');
+    const price = parseInt(priceStr || '0') || 0;
+    const part: RepairPart = {
+      id: uuidv4(), productId: '', productName: name,
+      quantity: qty, price, total: qty * price,
+    };
+    setForm({ ...form, parts: [...(form.parts || []), part] });
+
+    // اگر قطعه در انبار موجود است، به انبار اضافه شود (برای قطعات جدید)
+    const existingProduct = db.getProducts().find(p => p.name === name);
+    if (!existingProduct) {
+      // ایجاد محصول جدید در انبار
+      const newProduct = {
+        id: uuidv4(), name, brand: '', model: '', category: 'قطعات',
+        sku: '', barcode: '', imeiRequired: false, serialRequired: false,
+        color: '', storage: '', description: 'قطعه تعمیراتی',
+        buyPrice: price, sellPrice: Math.round(price * 1.3),
+        minStock: 1, stock: qty, status: 'active' as const,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
-      setForm({ ...form, parts: [...(form.parts || []), part] });
-      showToast('success', `${name} (${quantity} عدد) اضافه شد`);
+      db.saveProduct(newProduct);
+      showToast('info', `قطعه "${name}" به انبار اضافه شد`);
     }
   };
 
@@ -124,181 +120,18 @@ export default function Repairs() {
     setForm({ ...form, parts: (form.parts || []).filter(p => p.id !== id) });
   };
 
-  const printReceipt = (repair: Repair) => {
-    const settings = db.getSettings();
-    const printWindow = window.open('', '', 'width=400,height=600');
-    if (!printWindow) return;
-    
-    const html = `
-      <!DOCTYPE html>
-      <html dir="rtl" lang="fa">
-      <head>
-        <meta charset="UTF-8">
-        <title>رسید پذیرش تعمیر #${repair.ticketNumber}</title>
-        <style>
-          body { font-family: Tahoma, Arial, sans-serif; padding: 10px; direction: rtl; font-size: 12px; }
-          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
-          .header h1 { margin: 0; font-size: 16px; }
-          .info { margin: 10px 0; }
-          .info p { margin: 5px 0; }
-          .section { margin: 15px 0; padding: 10px; border: 1px solid #ddd; }
-          .section h3 { margin: 0 0 10px 0; font-size: 13px; }
-          .footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 10px; }
-          .signature { margin-top: 30px; display: flex; justify-content: space-between; }
-          .signature div { width: 45%; text-align: center; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>${settings.storeName}</h1>
-          <p>رسید پذیرش تعمیر</p>
-          <p>شماره: ${repair.ticketNumber}</p>
-          <p>تاریخ: ${toJalali(repair.entryDate)}</p>
-        </div>
-        
-        <div class="section">
-          <h3>مشخصات مشتری</h3>
-          <p><strong>نام:</strong> ${repair.customerName}</p>
-          <p><strong>موبایل:</strong> ${repair.customerMobile || '-'}</p>
-        </div>
-        
-        <div class="section">
-          <h3>مشخصات دستگاه</h3>
-          <p><strong>دستگاه:</strong> ${repair.device}</p>
-          <p><strong>برند:</strong> ${repair.brand || '-'}</p>
-          <p><strong>مدل:</strong> ${repair.model || '-'}</p>
-          <p><strong>IMEI:</strong> ${repair.imei || '-'}</p>
-          <p><strong>رنگ:</strong> ${repair.color || '-'}</p>
-          <p><strong>وضعیت ظاهری:</strong> ${repair.physicalCondition || '-'}</p>
-          <p><strong>لوازم همراه:</strong> ${repair.accessories || '-'}</p>
-        </div>
-        
-        <div class="section">
-          <h3>ایراد اعلامی</h3>
-          <p>${repair.reportedIssue || '-'}</p>
-        </div>
-        
-        <div class="footer">
-          <p>این رسید به منزله پذیرش دستگاه می‌باشد</p>
-          <div class="signature">
-            <div>امضاء مشتری</div>
-            <div>امضاء پذیرش</div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-    
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 500);
+  const updatePartQty = (id: string, qty: number) => {
+    setForm({
+      ...form,
+      parts: (form.parts || []).map(p => p.id === id ? { ...p, quantity: qty, total: qty * p.price } : p)
+    });
   };
 
-  const printInvoice = (repair: Repair) => {
-    const settings = db.getSettings();
-    const printWindow = window.open('', '', 'width=400,height=600');
-    if (!printWindow) return;
-    
-    const html = `
-      <!DOCTYPE html>
-      <html dir="rtl" lang="fa">
-      <head>
-        <meta charset="UTF-8">
-        <title>فاکتور تعمیر #${repair.ticketNumber}</title>
-        <style>
-          body { font-family: Tahoma, Arial, sans-serif; padding: 10px; direction: rtl; font-size: 12px; }
-          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
-          .header h1 { margin: 0; font-size: 16px; }
-          .info { margin: 10px 0; }
-          table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-          th { background-color: #f2f2f2; }
-          .total { font-weight: bold; font-size: 14px; }
-          .footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>${settings.storeName}</h1>
-          <p>فاکتور تعمیر</p>
-          <p>شماره: ${repair.ticketNumber}</p>
-          <p>تاریخ: ${toJalali(repair.entryDate)}</p>
-        </div>
-        
-        <div class="info">
-          <p><strong>مشتری:</strong> ${repair.customerName}</p>
-          <p><strong>دستگاه:</strong> ${repair.device} ${repair.brand} ${repair.model}</p>
-        </div>
-        
-        <table>
-          <thead>
-            <tr>
-              <th>شرح</th>
-              <th>تعداد</th>
-              <th>قیمت</th>
-              <th>جمع</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${repair.parts.map(p => `
-              <tr>
-                <td>${p.productName}</td>
-                <td>${p.quantity}</td>
-                <td>${formatCurrency(p.price, settings.currency)}</td>
-                <td>${formatCurrency(p.total, settings.currency)}</td>
-              </tr>
-            `).join('')}
-            <tr>
-              <td><strong>اجرت تعمیر</strong></td>
-              <td>1</td>
-              <td>${formatCurrency(repair.labor, settings.currency)}</td>
-              <td>${formatCurrency(repair.labor, settings.currency)}</td>
-            </tr>
-            ${repair.extraCost > 0 ? `
-              <tr>
-                <td><strong>هزینه‌های اضافی</strong></td>
-                <td>1</td>
-                <td>${formatCurrency(repair.extraCost, settings.currency)}</td>
-                <td>${formatCurrency(repair.extraCost, settings.currency)}</td>
-              </tr>
-            ` : ''}
-          </tbody>
-          <tfoot>
-            <tr class="total">
-              <td colspan="3"><strong>جمع کل</strong></td>
-              <td><strong>${formatCurrency(repair.totalCost, settings.currency)}</strong></td>
-            </tr>
-            <tr>
-              <td colspan="3">پرداخت شده</td>
-              <td>${formatCurrency(repair.paid, settings.currency)}</td>
-            </tr>
-            ${repair.remaining > 0 ? `
-              <tr>
-                <td colspan="3"><strong>مانده</strong></td>
-                <td><strong>${formatCurrency(repair.remaining, settings.currency)}</strong></td>
-              </tr>
-            ` : ''}
-          </tfoot>
-        </table>
-        
-        <div class="footer">
-          <p>از اعتماد شما متشکریم</p>
-        </div>
-      </body>
-      </html>
-    `;
-    
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 500);
+  const updatePartPrice = (id: string, price: number) => {
+    setForm({
+      ...form,
+      parts: (form.parts || []).map(p => p.id === id ? { ...p, price, total: p.quantity * price } : p)
+    });
   };
 
   const save = () => {
@@ -340,12 +173,26 @@ export default function Repairs() {
       createdAt: editRepair?.createdAt || new Date().toISOString(),
     };
 
-    // If status changed to delivered, consume parts from stock
+    // اگر وضعیت به delivered تغییر کرد، قطعات از انبار کم شود
     if (editRepair && editRepair.status !== 'delivered' && repair.status === 'delivered') {
       repair.parts.forEach(part => {
         if (part.productId) {
           const product = db.getProduct(part.productId);
           if (product) {
+            product.stock -= part.quantity;
+            db.saveProduct(product);
+            db.saveStockMovement({
+              id: uuidv4(), productId: product.id, productName: product.name,
+              type: 'out', quantity: part.quantity, reference: repair.ticketNumber,
+              referenceType: 'repair', referenceId: repair.id,
+              userId: user?.id || '', userName: user?.fullName || '',
+              date: new Date().toISOString(), notes: 'مصرف در تعمیر',
+            });
+          }
+        } else {
+          // قطعه دستی - از انبار کم شود
+          const product = db.getProducts().find(p => p.name === part.productName);
+          if (product && product.stock >= part.quantity) {
             product.stock -= part.quantity;
             db.saveProduct(product);
             db.saveStockMovement({
@@ -386,7 +233,7 @@ export default function Repairs() {
 
       <div className="flex gap-2">
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="جستجو شماره، مشتری، دستگاه..." className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
+          placeholder="جستجو..." className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
           className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800">
           <option value="all">همه</option>
@@ -410,18 +257,14 @@ export default function Repairs() {
               <div className="text-left">
                 <p className="text-sm font-bold">{formatCurrency(r.totalCost, settings.currency)}</p>
                 {r.remaining > 0 && <p className="text-xs text-red-500">مانده: {formatCurrency(r.remaining, settings.currency)}</p>}
-                <div className="flex items-center gap-2 mt-1">
-                  <button onClick={() => printReceipt(r)} className="text-xs text-purple-500 flex items-center gap-1" title="چاپ رسید">
-                    <FileText size={12} /> رسید
-                  </button>
-                  {r.status === 'delivered' && (
-                    <button onClick={() => printInvoice(r)} className="text-xs text-green-500 flex items-center gap-1" title="چاپ فاکتور">
-                      <Printer size={12} /> فاکتور
-                    </button>
-                  )}
+                <div className="flex items-center gap-1 mt-1">
                   {hasPermission('repairs.edit') && (
                     <button onClick={() => openEdit(r)} className="text-xs text-blue-500 flex items-center gap-1"><Edit size={12} /> ویرایش</button>
                   )}
+                  <button onClick={() => { setPrintRepairId(r.id); setPrintType('receipt'); }}
+                    className="text-xs text-purple-500 flex items-center gap-1"><Printer size={12} /> رسید</button>
+                  <button onClick={() => { setPrintRepairId(r.id); setPrintType('invoice'); }}
+                    className="text-xs text-green-500 flex items-center gap-1"><Printer size={12} /> فاکتور</button>
                 </div>
               </div>
             </div>
@@ -470,50 +313,42 @@ export default function Repairs() {
                   <input type="text" value={form.imei} onChange={e => setForm({ ...form, imei: e.target.value })}
                     className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
                 </div>
-                <div>
-                  <label className="text-xs text-slate-500">رنگ</label>
-                  <input type="text" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500">رمز دستگاه</label>
-                  <input type="text" value={form.devicePassword} onChange={e => setForm({ ...form, devicePassword: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-slate-500">وضعیت ظاهری</label>
-                <input type="text" value={form.physicalCondition} onChange={e => setForm({ ...form, physicalCondition: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" placeholder="خط و خش، شکستگی و..." />
-              </div>
-              <div>
-                <label className="text-xs text-slate-500">لوازم همراه</label>
-                <input type="text" value={form.accessories} onChange={e => setForm({ ...form, accessories: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" placeholder="شارژر، کابل، گلس و..." />
               </div>
               <div>
                 <label className="text-xs text-slate-500">ایراد اعلامی</label>
                 <textarea value={form.reportedIssue} onChange={e => setForm({ ...form, reportedIssue: e.target.value })}
                   className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" rows={2} />
               </div>
-              <div>
-                <label className="text-xs text-slate-500">عیب‌یابی</label>
-                <textarea value={form.diagnosis} onChange={e => setForm({ ...form, diagnosis: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" rows={2} />
-              </div>
 
               {/* Parts */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs text-slate-500">قطعات مصرفی</label>
-                  <button onClick={addPart} className="text-xs text-blue-600">+ افزودن قطعه</button>
+                  <label className="text-xs font-bold">قطعات مصرفی</label>
+                  <div className="flex gap-1">
+                    <button onClick={addPartFromStock} className="text-xs text-blue-600">+ از انبار</button>
+                    <button onClick={addPartManual} className="text-xs text-green-600">+ دستی</button>
+                  </div>
                 </div>
                 {(form.parts || []).map(p => (
-                  <div key={p.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-700/50 rounded mb-1 text-xs">
-                    <span>{p.productName} × {p.quantity}</span>
-                    <div className="flex items-center gap-2">
-                      <span>{formatCurrency(p.total, settings.currency)}</span>
+                  <div key={p.id} className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded mb-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium flex-1">{p.productName}</span>
                       <button onClick={() => removePart(p.id)} className="text-red-500"><X size={12} /></button>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-500">تعداد:</span>
+                        <input type="number" value={p.quantity} min="1"
+                          onChange={e => updatePartQty(p.id, Number(e.target.value) || 1)}
+                          className="w-14 px-1 py-0.5 border border-slate-200 dark:border-slate-600 rounded text-xs bg-white dark:bg-slate-800" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-500">قیمت:</span>
+                        <input type="number" value={p.price}
+                          onChange={e => updatePartPrice(p.id, Number(e.target.value) || 0)}
+                          className="w-20 px-1 py-0.5 border border-slate-200 dark:border-slate-600 rounded text-xs bg-white dark:bg-slate-800" />
+                      </div>
+                      <span className="text-xs font-bold mr-auto">{formatCurrency(p.total, settings.currency)}</span>
                     </div>
                   </div>
                 ))}
@@ -552,18 +387,16 @@ export default function Repairs() {
                 </select>
               </div>
 
-              <div>
-                <label className="text-xs text-slate-500">توضیحات</label>
-                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" rows={2} />
-              </div>
-
               <button onClick={save} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium">
                 {editRepair ? 'ذخیره تغییرات' : 'ثبت پذیرش'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {printRepairId && (
+        <RepairPrint repairId={printRepairId} type={printType} onClose={() => setPrintRepairId(null)} />
       )}
     </div>
   );

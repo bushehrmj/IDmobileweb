@@ -242,6 +242,22 @@ export interface Settings {
   theme: 'light' | 'dark';
   paperSize: '80mm' | 'a5' | 'a4';
   defaultProfitPercent: number;
+  // Invoice settings
+  showLogoOnInvoice: boolean;
+  showStorePhone: boolean;
+  showStoreAddress: boolean;
+  showCustomerInfo: boolean;
+  showSellerName: boolean;
+  showIMEI: boolean;
+  showBarcode: boolean;
+  showTax: boolean;
+  showDiscount: boolean;
+  showNotes: boolean;
+  showFooter: boolean;
+  invoiceFooterText: string;
+  invoiceHeaderNote: string;
+  showProfitOnInvoice: boolean;
+  receiptPaperSize: '80mm' | 'a5' | 'a4';
 }
 
 export interface LoginAttempt {
@@ -329,6 +345,21 @@ export function initializeDB(): void {
     theme: 'light',
     paperSize: '80mm',
     defaultProfitPercent: 15,
+    showLogoOnInvoice: true,
+    showStorePhone: true,
+    showStoreAddress: true,
+    showCustomerInfo: true,
+    showSellerName: true,
+    showIMEI: true,
+    showBarcode: false,
+    showTax: true,
+    showDiscount: true,
+    showNotes: true,
+    showFooter: true,
+    invoiceFooterText: 'از خرید شما متشکریم',
+    invoiceHeaderNote: '',
+    showProfitOnInvoice: false,
+    receiptPaperSize: '80mm',
   };
   setSingle('settings', defaultSettings);
 
@@ -530,12 +561,19 @@ export const db = {
   // Settings
   getSettings: (): Settings => {
     const s = getSingle<Settings>('settings');
-    return s || {
+    const defaults: Settings = {
       storeName: 'ID Mobile', storePhone: '', storeAddress: '', storeDescription: '',
       logo: '', currency: 'تومان', taxRate: 0, invoiceStartNumber: 1001,
       repairStartNumber: 5001, sessionTimeout: 30, theme: 'light', paperSize: '80mm',
       defaultProfitPercent: 15,
+      showLogoOnInvoice: true, showStorePhone: true, showStoreAddress: true,
+      showCustomerInfo: true, showSellerName: true, showIMEI: true, showBarcode: false,
+      showTax: true, showDiscount: true, showNotes: true, showFooter: true,
+      invoiceFooterText: 'از خرید شما متشکریم', invoiceHeaderNote: '',
+      showProfitOnInvoice: false, receiptPaperSize: '80mm',
     };
+    if (!s) return defaults;
+    return { ...defaults, ...s };
   },
   saveSettings: (settings: Settings): void => setSingle('settings', settings),
 

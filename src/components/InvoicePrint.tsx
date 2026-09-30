@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { db, type Sale } from '../lib/db';
 import { formatCurrency, toJalali, toJalaliFull } from '../lib/auth';
-import { Printer, X, Download } from 'lucide-react';
+import { Printer, X } from 'lucide-react';
 
 interface InvoicePrintProps {
   saleId: string;
@@ -52,12 +52,15 @@ export default function InvoicePrint({ saleId, onClose }: InvoicePrintProps) {
         <div className={`p-6 ${settings.paperSize === '80mm' ? 'invoice-80mm' : settings.paperSize === 'a5' ? 'invoice-a5' : 'invoice-a4'}`} dir="rtl">
           {/* Header */}
           <div className="text-center border-b-2 border-slate-800 pb-4 mb-4">
-            {settings.logo && (
+            {settings.logo && settings.showLogoOnInvoice && (
               <img src={settings.logo} alt="Logo" className="w-16 h-16 mx-auto mb-2 object-cover" />
             )}
             <h1 className="text-xl font-bold">{settings.storeName}</h1>
-            {settings.storePhone && <p className="text-sm">تلفن: {settings.storePhone}</p>}
-            {settings.storeAddress && <p className="text-xs mt-1">{settings.storeAddress}</p>}
+            {settings.showStorePhone && settings.storePhone && <p className="text-sm">تلفن: {settings.storePhone}</p>}
+            {settings.showStoreAddress && settings.storeAddress && <p className="text-xs mt-1">{settings.storeAddress}</p>}
+            {settings.invoiceHeaderNote && (
+              <p className="text-xs text-slate-600 mt-1">{settings.invoiceHeaderNote}</p>
+            )}
             <div className="mt-3 text-sm">
               <p>فاکتور فروش شماره: <span className="font-bold">{sale.invoiceNumber}</span></p>
               <p>تاریخ: {toJalali(sale.date)} | ساعت: {sale.time}</p>
@@ -65,10 +68,12 @@ export default function InvoicePrint({ saleId, onClose }: InvoicePrintProps) {
           </div>
 
           {/* Customer Info */}
-          <div className="mb-4 text-sm">
-            <p><span className="font-bold">مشتری:</span> {sale.customerName}</p>
-            <p><span className="font-bold">فروشنده:</span> {sale.sellerName}</p>
-          </div>
+          {settings.showCustomerInfo && (
+            <div className="mb-4 text-sm">
+              <p><span className="font-bold">مشتری:</span> {sale.customerName}</p>
+              {settings.showSellerName && <p><span className="font-bold">فروشنده:</span> {sale.sellerName}</p>}
+            </div>
+          )}
 
           {/* Items Table */}
           <table className="w-full text-xs border-collapse mb-4">
@@ -76,7 +81,7 @@ export default function InvoicePrint({ saleId, onClose }: InvoicePrintProps) {
               <tr className="border-b-2 border-slate-800">
                 <th className="py-2 text-right">#</th>
                 <th className="py-2 text-right">کالا</th>
-                {sale.items.some(i => i.imei1) && <th className="py-2 text-right">IMEI</th>}
+                {settings.showIMEI && sale.items.some(i => i.imei1) && <th className="py-2 text-right">IMEI</th>}
                 <th className="py-2 text-center">تعداد</th>
                 <th className="py-2 text-left">قیمت</th>
                 <th className="py-2 text-left">جمع</th>
@@ -90,7 +95,7 @@ export default function InvoicePrint({ saleId, onClose }: InvoicePrintProps) {
                     <div>{item.productName}</div>
                     {item.brand && <div className="text-[10px] text-slate-500">{item.brand} {item.model}</div>}
                   </td>
-                  {sale.items.some(i => i.imei1) && <td className="py-2 font-mono text-[10px]">{item.imei1 || '-'}</td>}
+                  {settings.showIMEI && sale.items.some(i => i.imei1) && <td className="py-2 font-mono text-[10px]">{item.imei1 || '-'}</td>}
                   <td className="py-2 text-center">{item.quantity}</td>
                   <td className="py-2 text-left">{formatCurrency(item.sellPrice, settings.currency)}</td>
                   <td className="py-2 text-left font-bold">{formatCurrency(item.total, settings.currency)}</td>
@@ -105,13 +110,13 @@ export default function InvoicePrint({ saleId, onClose }: InvoicePrintProps) {
               <span>جمع کل:</span>
               <span>{formatCurrency(sale.subtotal, settings.currency)}</span>
             </div>
-            {sale.discount > 0 && (
+            {settings.showDiscount && sale.discount > 0 && (
               <div className="flex justify-between text-red-600">
                 <span>تخفیف:</span>
                 <span>- {formatCurrency(sale.discount, settings.currency)}</span>
               </div>
             )}
-            {sale.tax > 0 && (
+            {settings.showTax && sale.tax > 0 && (
               <div className="flex justify-between">
                 <span>مالیات:</span>
                 <span>{formatCurrency(sale.tax, settings.currency)}</span>
@@ -138,7 +143,7 @@ export default function InvoicePrint({ saleId, onClose }: InvoicePrintProps) {
           </div>
 
           {/* Notes */}
-          {sale.notes && (
+          {settings.showNotes && sale.notes && (
             <div className="mt-4 pt-3 border-t border-slate-300 text-xs">
               <p className="font-bold">یادداشت:</p>
               <p>{sale.notes}</p>
@@ -146,10 +151,12 @@ export default function InvoicePrint({ saleId, onClose }: InvoicePrintProps) {
           )}
 
           {/* Footer */}
-          <div className="mt-6 pt-3 border-t border-slate-300 text-center text-xs text-slate-500">
-            <p>از خرید شما متشکریم</p>
-            {settings.storeDescription && <p className="mt-1">{settings.storeDescription}</p>}
-          </div>
+          {settings.showFooter && (
+            <div className="mt-6 pt-3 border-t border-slate-300 text-center text-xs text-slate-500">
+              <p>{settings.invoiceFooterText || 'از خرید شما متشکریم'}</p>
+              {settings.storeDescription && <p className="mt-1">{settings.storeDescription}</p>}
+            </div>
+          )}
         </div>
       </div>
     </div>
