@@ -38,6 +38,7 @@ export default function Repairs() {
     labor: 0, partsCost: 0, extraCost: 0, totalCost: 0, paid: 0, remaining: 0,
     status: 'received', entryDate: new Date().toISOString().split('T')[0], notes: '',
   });
+  const [settled, setSettled] = useState(false);
 
   useEffect(() => { loadRepairs(); }, []);
   const loadRepairs = () => setRepairs(db.getRepairs().reverse());
@@ -57,10 +58,16 @@ export default function Repairs() {
       labor: 0, partsCost: 0, extraCost: 0, totalCost: 0, paid: 0, remaining: 0,
       status: 'received', entryDate: new Date().toISOString().split('T')[0], notes: '',
     });
+    setSettled(false);
     setShowForm(true);
   };
 
-  const openEdit = (r: Repair) => { setEditRepair(r); setForm({ ...r }); setShowForm(true); };
+  const openEdit = (r: Repair) => { 
+    setEditRepair(r); 
+    setForm({ ...r }); 
+    setSettled(r.remaining === 0 && r.status === 'delivered');
+    setShowForm(true); 
+  };
 
   const calcTotal = (f: Partial<Repair>) => {
     const partsCost = (f.parts || []).reduce((s, p) => s + p.total, 0);
@@ -138,8 +145,16 @@ export default function Repairs() {
     if (!form.customerName?.trim()) { showToast('error', 'نام مشتری الزامی است'); return; }
     if (!form.device?.trim()) { showToast('error', 'نام دستگاه الزامی است'); return; }
 
+    // بررسی محدودیت ویرایش بعد از تسویه
+    if (editRepair && editRepair.remaining === 0 && editRepair.status === 'delivered' && user?.role !== 'admin') {
+      showToast('error', 'این تعمیر تسویه شده و فقط مدیر می‌تواند ویرایش کند');
+      return;
+    }
+
     const { partsCost, totalCost } = calcTotal(form);
-    const paid = Number(form.paid) || 0;
+    
+    // اگر تسویه کامل انتخاب شده، paid برابر totalCost شود
+    const paid = settled ? totalCost : (Number(form.paid) || 0);
 
     const repair: Repair = {
       id: editRepair?.id || uuidv4(),
@@ -206,26 +221,36 @@ export default function Repairs() {
         }
       });
 
-      // ایجاد فاکتور فروش برای اجرت و قطعات
-      if (repair.totalCost > 0) {
-        // پیدا کردن یا ایجاد مشتری پیش‌فرض برای تعمیرات
-        let repairCustomer = db.getCustomers().find(c => c.firstName === 'مشتری' && c.lastName === 'تعمیرات');
-        if (!repairCustomer) {
-          repairCustomer = {
+      // ایجاد فاکتور فروش برای اجرت و قطعات - فقط وقتی تسویه شده
+      if (repair.totalCost > 0 && repair.remaining === 0) {
+        // پیدا کردن یا ایجاد مشتری واقعی با نام و موبایل واقعی
+        const customerNames = repair.customerName.trim().split(' ');
+        const firstName = customerNames[0] || '';
+        const lastName = customerNames.slice(1).join(' ') || '';
+        
+        // بررسی آیا مشتری با این نام و موبایل قبلاً وجود دارد
+        let customer = db.getCustomers().find(c => 
+          c.mobile === repair.customerMobile && repair.customerMobile !== ''
+        );
+        
+        if (!customer) {
+          // ایجاد مشتری جدید
+          customer = {
             id: uuidv4(),
-            firstName: 'مشتری',
-            lastName: 'تعمیرات',
+            firstName: firstName,
+            lastName: lastName,
             mobile: repair.customerMobile || '',
             nationalId: '',
             address: '',
-            notes: '',
+            notes: `مشتری تعمیرات - ${repair.device} ${repair.brand} ${repair.model}`,
             totalPurchase: 0,
             totalPaid: 0,
             debt: 0,
             invoiceCount: 0,
             createdAt: new Date().toISOString(),
           };
-          db.saveCustomer(repairCustomer);
+          db.saveCustomer(customer);
+          showToast('success', `مشتری ${repair.customerName} به لیست مشتریان اضافه شد`);
         }
 
         // ایجاد آیتم‌های فاکتور
@@ -276,7 +301,7 @@ export default function Repairs() {
           invoiceNumber: db.getNextInvoiceNumber(),
           date: new Date().toISOString(),
           time: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-          customerId: repairCustomer.id,
+          customerId: customer.id,
           customerName: repair.customerName,
           sellerId: user?.id || '',
           sellerName: user?.fullName || '',
@@ -286,16 +311,24 @@ export default function Repairs() {
           discountType: 'amount' as const,
           tax: 0,
           total: repair.totalCost,
-          paid: repair.paid,
-          remaining: repair.remaining,
-          paymentMethod: repair.paid >= repair.totalCost ? 'cash' as const : 'credit' as const,
+          paid: repair.totalCost, // کاملاً تسویه شده
+          remaining: 0,
+          paymentMethod: 'cash' as const,
           status: 'completed' as const,
           notes: `فاکتور تعمیر شماره ${repair.ticketNumber} - ${repair.device} ${repair.brand} ${repair.model}`,
           createdAt: new Date().toISOString(),
         };
 
         db.saveSale(sale);
-        showToast('success', `فاکتور فروش #${sale.invoiceNumber} برای تعمیر ایجاد شد`);
+        
+        // به‌روزرسانی اطلاعات مشتری
+        customer.totalPurchase += repair.totalCost;
+        customer.totalPaid += repair.totalCost;
+        customer.invoiceCount += 1;
+        customer.lastPurchase = new Date().toISOString();
+        db.saveCustomer(customer);
+        
+        showToast('success', `فاکتور فروش #${sale.invoiceNumber} برای تعمیر ایجاد و تسویه شد`);
       }
     }
 
@@ -348,10 +381,17 @@ export default function Repairs() {
               </div>
               <div className="text-left">
                 <p className="text-sm font-bold">{formatCurrency(r.totalCost, settings.currency)}</p>
-                {r.remaining > 0 && <p className="text-xs text-red-500">مانده: {formatCurrency(r.remaining, settings.currency)}</p>}
+                {r.remaining > 0 ? (
+                  <p className="text-xs text-red-500">مانده: {formatCurrency(r.remaining, settings.currency)}</p>
+                ) : r.status === 'delivered' && (
+                  <p className="text-xs text-green-600 font-bold">✓ تسویه شده</p>
+                )}
                 <div className="flex items-center gap-1 mt-1">
-                  {hasPermission('repairs.edit') && (
+                  {hasPermission('repairs.edit') && (r.remaining > 0 || r.status !== 'delivered' || user?.role === 'admin') && (
                     <button onClick={() => openEdit(r)} className="text-xs text-blue-500 flex items-center gap-1"><Edit size={12} /> ویرایش</button>
+                  )}
+                  {r.remaining === 0 && r.status === 'delivered' && user?.role !== 'admin' && (
+                    <span className="text-[10px] text-slate-400 italic">فقط مدیر می‌تواند ویرایش کند</span>
                   )}
                   <button onClick={() => { setPrintRepairId(r.id); setPrintType('receipt'); }}
                     className="text-xs text-purple-500 flex items-center gap-1"><Printer size={12} /> رسید</button>
@@ -464,10 +504,21 @@ export default function Repairs() {
                 </div>
               </div>
 
-              {(() => { const { totalCost } = calcTotal(form); const rem = totalCost - (Number(form.paid) || 0); return (
+              {/* تسویه کامل */}
+              <label className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg cursor-pointer border border-green-200 dark:border-green-800">
+                <input type="checkbox" checked={settled} onChange={e => setSettled(e.target.checked)}
+                  className="w-5 h-5 rounded text-green-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-green-700 dark:text-green-400">تسویه کامل</p>
+                  <p className="text-xs text-green-600 dark:text-green-500">با فعال کردن، مبلغ پرداختی = مبلغ کل و فاکتور فروش خودکار ایجاد می‌شود</p>
+                </div>
+              </label>
+
+              {(() => { const { totalCost } = calcTotal(form); const paidAmount = settled ? totalCost : (Number(form.paid) || 0); const rem = totalCost - paidAmount; return (
                 <div className="flex justify-between text-sm bg-slate-50 dark:bg-slate-700/50 p-2 rounded">
                   <span>جمع کل: {formatCurrency(totalCost, settings.currency)}</span>
                   {rem > 0 && <span className="text-red-500">مانده: {formatCurrency(rem, settings.currency)}</span>}
+                  {rem === 0 && settled && <span className="text-green-600 font-bold">✓ تسویه شده</span>}
                 </div>
               ); })()}
 
