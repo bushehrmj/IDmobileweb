@@ -79,7 +79,10 @@ npm install
 npm run build
 
 # 4. اجرای سرور محلی
-node server.js
+cd /d C:\IDmobileweb
+ren server.js server.cjs
+node server.cjs
+**********node server.js*****
 ```
 
 ### دسترسی به برنامه
