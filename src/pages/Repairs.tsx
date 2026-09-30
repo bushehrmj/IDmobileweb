@@ -65,17 +65,157 @@ export default function Repairs() {
     setShowForm(true);
   };
 
+  // ریست settled وقتی فرم باز می‌شود
+  useEffect(() => {
+    if (showForm && editRepair) {
+      // اگر تعمیر تسویه شده است، settled را true کن
+      // این در RepairForm مدیریت می‌شود
+    }
+  }, [showForm, editRepair]);
+
   const handleSave = (repairData: Repair) => {
+    // محاسبه هزینه نهایی
+    const finalTotal = (repairData.totalCost || 0) - (repairData.discount || 0);
+    const remaining = finalTotal - (repairData.paid || 0);
+    
+    const finalRepairData: Repair = {
+      ...repairData,
+      finalTotal,
+      remaining: remaining > 0 ? remaining : 0,
+      updatedAt: new Date().toISOString(),
+    };
+
     if (editRepair) {
       // Update existing repair
-      const updatedRepair = { ...repairData, updatedAt: new Date().toISOString() };
-      db.saveRepair(updatedRepair);
+      db.saveRepair(finalRepairData);
       showToast('success', 'تعمیر ویرایش شد');
     } else {
       // Create new repair
-      db.saveRepair(repairData);
+      db.saveRepair(finalRepairData);
       showToast('success', 'تعمیر ثبت شد');
     }
+
+    // اضافه کردن مشتری به لیست مشتریان
+    if (finalRepairData.customerName && finalRepairData.customerMobile) {
+      const customerNames = finalRepairData.customerName.trim().split(' ');
+      const firstName = customerNames[0] || '';
+      const lastName = customerNames.slice(1).join(' ') || '';
+      
+      // بررسی آیا مشتری با این موبایل قبلاً وجود دارد
+      let customer = db.getCustomers().find(c => 
+        c.mobile === finalRepairData.customerMobile && finalRepairData.customerMobile !== ''
+      );
+      
+      if (!customer) {
+        // ایجاد مشتری جدید
+        customer = {
+          id: uuidv4(),
+          firstName: firstName,
+          lastName: lastName,
+          mobile: finalRepairData.customerMobile || '',
+          nationalId: finalRepairData.customerNationalId || '',
+          address: finalRepairData.customerAddress || '',
+          notes: `مشتری تعمیرات - ${finalRepairData.brand} ${finalRepairData.model}`,
+          totalPurchase: 0,
+          totalPaid: 0,
+          debt: 0,
+          invoiceCount: 0,
+          createdAt: new Date().toISOString(),
+        };
+        db.saveCustomer(customer);
+        showToast('success', `مشتری ${finalRepairData.customerName} به لیست مشتریان اضافه شد`);
+      }
+    }
+
+    // اگر تسویه کامل شده و وضعیت تحویل است، فاکتور فروش ایجاد شود
+    if (finalRepairData.remaining === 0 && finalRepairData.status === 'delivered' && finalRepairData.finalTotal > 0) {
+      // پیدا کردن مشتری
+      const customer = db.getCustomers().find(c => 
+        c.mobile === finalRepairData.customerMobile && finalRepairData.customerMobile !== ''
+      );
+
+      if (customer) {
+        // ایجاد آیتم‌های فاکتور
+        const saleItems: any[] = [];
+        
+        // اضافه کردن قطعات
+        if (finalRepairData.parts && finalRepairData.parts.length > 0) {
+          finalRepairData.parts.forEach(part => {
+            const product = part.productId ? db.getProduct(part.productId) : db.getProducts().find(p => p.name === part.productName);
+            saleItems.push({
+              id: uuidv4(),
+              productId: product?.id || '',
+              productName: part.productName,
+              brand: '',
+              model: '',
+              barcode: '',
+              imei1: '',
+              imei2: '',
+              quantity: part.quantity,
+              buyPrice: product?.buyPrice || 0,
+              sellPrice: part.price,
+              discount: 0,
+              total: part.total,
+            });
+          });
+        }
+
+        // اضافه کردن اجرت به عنوان یک آیتم
+        if (finalRepairData.labor > 0) {
+          saleItems.push({
+            id: uuidv4(),
+            productId: '',
+            productName: 'اجرت تعمیر',
+            brand: '',
+            model: '',
+            barcode: '',
+            imei1: '',
+            imei2: '',
+            quantity: 1,
+            buyPrice: 0,
+            sellPrice: finalRepairData.labor,
+            discount: 0,
+            total: finalRepairData.labor,
+          });
+        }
+
+        // ایجاد فاکتور فروش
+        const sale = {
+          id: uuidv4(),
+          invoiceNumber: db.getNextInvoiceNumber(),
+          date: new Date().toISOString(),
+          time: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+          customerId: customer.id,
+          customerName: finalRepairData.customerName,
+          sellerId: user?.id || '',
+          sellerName: user?.fullName || '',
+          items: saleItems,
+          subtotal: finalRepairData.finalTotal,
+          discount: 0,
+          discountType: 'amount' as const,
+          tax: 0,
+          total: finalRepairData.finalTotal,
+          paid: finalRepairData.finalTotal,
+          remaining: 0,
+          paymentMethod: 'cash' as const,
+          status: 'completed' as const,
+          notes: `فاکتور تعمیر شماره ${finalRepairData.ticketNumber} - ${finalRepairData.brand} ${finalRepairData.model}`,
+          createdAt: new Date().toISOString(),
+        };
+
+        db.saveSale(sale);
+        
+        // به‌روزرسانی اطلاعات مشتری
+        customer.totalPurchase += finalRepairData.finalTotal;
+        customer.totalPaid += finalRepairData.finalTotal;
+        customer.invoiceCount += 1;
+        customer.lastPurchase = new Date().toISOString();
+        db.saveCustomer(customer);
+        
+        showToast('success', `فاکتور فروش #${sale.invoiceNumber} برای تعمیر ایجاد و تسویه شد`);
+      }
+    }
+
     setShowForm(false);
     setEditRepair(null);
     loadRepairs();

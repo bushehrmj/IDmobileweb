@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth, useToast } from '../lib/auth';
 import { db, type Repair, type PhysicalConditionChecklist, type AccessoriesChecklist, type TestChecklist, type ConditionStatus, type TestStatus, type RepairStatus, type RepairConfirmations, type RepairWarnings } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
@@ -188,6 +188,16 @@ export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps
   const [step, setStep] = useState(1);
   const totalSteps = 11;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [settled, setSettled] = useState(false);
+
+  // وقتی repair تغییر می‌کند، settled را تنظیم کن
+  useEffect(() => {
+    if (repair && repair.remaining === 0 && repair.status === 'delivered') {
+      setSettled(true);
+    } else {
+      setSettled(false);
+    }
+  }, [repair]);
 
   const now = new Date();
   const [form, setForm] = useState<Partial<Repair>>(repair || {
@@ -367,12 +377,24 @@ export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps
       return;
     }
 
-    const finalTotal = (form.totalCost || 0) - (form.discount || 0);
-    const remaining = finalTotal - (form.paid || 0);
+    // محاسبه هزینه‌ها
+    const totalCost = (form.estimatedPartsCost || 0) + (form.estimatedLabor || 0) + (form.estimatedExtraCost || 0);
+    const discount = form.discount || 0;
+    const finalTotal = totalCost - discount;
+    
+    // اگر تسویه کامل است، paid برابر finalTotal شود
+    const paid = settled ? finalTotal : (form.paid || 0);
+    const remaining = finalTotal - paid;
 
     const repairData: Repair = {
       ...form as any,
+      partsCost: form.estimatedPartsCost || 0,
+      labor: form.estimatedLabor || 0,
+      extraCost: form.estimatedExtraCost || 0,
+      totalCost,
+      discount,
       finalTotal,
+      paid,
       remaining: remaining > 0 ? remaining : 0,
     };
 
@@ -931,13 +953,14 @@ export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps
         );
 
       case 8: // برآورد هزینه
+        const estimatedTotal = (form.estimatedPartsCost || 0) + (form.estimatedLabor || 0) + (form.estimatedExtraCost || 0);
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-bold">مرحله ۸: برآورد هزینه</h3>
+            <h3 className="text-lg font-bold">مرحله ۸: هزینه و پرداخت</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">هزینه تقریبی قطعات</label>
+                <label className="block text-sm font-medium mb-1">هزینه قطعات</label>
                 <input
                   type="number"
                   value={form.estimatedPartsCost}
@@ -947,7 +970,7 @@ export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">اجرت تقریبی</label>
+                <label className="block text-sm font-medium mb-1">اجرت</label>
                 <input
                   type="number"
                   value={form.estimatedLabor}
@@ -967,21 +990,104 @@ export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">زمان تقریبی تحویل</label>
+                <label className="block text-sm font-medium mb-1">تخفیف</label>
                 <input
-                  type="date"
-                  value={form.estimatedDeliveryDate}
-                  onChange={e => updateField('estimatedDeliveryDate', e.target.value)}
+                  type="number"
+                  value={form.discount}
+                  onChange={e => updateField('discount', Number(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
             </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="flex justify-between text-sm mb-1">
+                <span>جمع کل:</span>
+                <span className="font-bold">{estimatedTotal.toLocaleString()} تومان</span>
+              </div>
+              {(form.discount || 0) > 0 && (
+                <div className="flex justify-between text-sm mb-1 text-red-600">
+                  <span>تخفیف:</span>
+                  <span>- {(form.discount || 0).toLocaleString()} تومان</span>
+                </div>
+              )}
+              <div className="flex justify-between text-base font-bold border-t border-gray-300 pt-1 mt-1">
+                <span>مبلغ نهایی:</span>
+                <span className="text-green-600">{(estimatedTotal - (form.discount || 0)).toLocaleString()} تومان</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">مبلغ پرداختی</label>
+                <input
+                  type="number"
+                  value={form.paid}
+                  onChange={e => {
+                    updateField('paid', Number(e.target.value));
+                    updateField('settled', false);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">روش پرداخت</label>
+                <select
+                  value={form.paymentMethod}
+                  onChange={e => updateField('paymentMethod', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="cash">نقدی</option>
+                  <option value="card">کارتخوان</option>
+                  <option value="transfer">کارت‌به‌کارت</option>
+                  <option value="bank">بانک</option>
+                  <option value="check">چک</option>
+                  <option value="credit">نسیه</option>
+                </select>
+              </div>
+            </div>
+
+            {/* تیک تسویه کامل */}
+            <label className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settled}
+                onChange={e => {
+                  const isSettled = e.target.checked;
+                  setSettled(isSettled);
+                  if (isSettled) {
+                    updateField('paid', estimatedTotal - (form.discount || 0));
+                  }
+                }}
+                className="w-5 h-5 rounded text-green-600"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-green-700">تسویه کامل</p>
+                <p className="text-xs text-green-600">با فعال کردن، مبلغ پرداختی = مبلغ نهایی</p>
+              </div>
+            </label>
+
+            {((estimatedTotal - (form.discount || 0)) - (form.paid || 0)) > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-700">
+                  مانده: {((estimatedTotal - (form.discount || 0)) - (form.paid || 0)).toLocaleString()} تومان
+                </p>
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-medium mb-1">زمان تقریبی تحویل</label>
+              <input
+                type="date"
+                value={form.estimatedDeliveryDate}
+                onChange={e => updateField('estimatedDeliveryDate', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
             
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm font-medium text-blue-900">
-                مبلغ برآوردی: {((form.estimatedPartsCost || 0) + (form.estimatedLabor || 0) + (form.estimatedExtraCost || 0)).toLocaleString()} تومان
-              </p>
-              <p className="text-xs text-blue-700 mt-1">
+              <p className="text-xs text-blue-700">
                 💡 این مبلغ تقریبی است و ممکن است پس از عیب‌یابی دقیق تغییر کند.
               </p>
             </div>
