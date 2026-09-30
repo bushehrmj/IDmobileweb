@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, ToastProvider, useAuth } from './lib/auth';
 import { initializeDB } from './lib/db';
+import { initializeFinancialDB } from './lib/financialDb';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -15,10 +16,21 @@ import Purchases from './pages/Purchases';
 import Inventory from './pages/Inventory';
 import BackupPage from './pages/Backup';
 import Payments from './pages/Payments';
+import FinancialDashboard from './pages/FinancialDashboard';
+import CashAndBank from './pages/CashAndBank';
+import ExpensesAndIncome from './pages/ExpensesAndIncome';
+import FinancialReports from './pages/FinancialReports';
+import ChartOfAccounts from './pages/ChartOfAccounts';
+import GeneralLedger from './pages/GeneralLedger';
+import Checks from './pages/Checks';
+import Transfers from './pages/Transfers';
+import CustomerAccounts from './pages/CustomerAccounts';
+import SupplierAccounts from './pages/SupplierAccounts';
 import { Shield, FileWarning } from 'lucide-react';
 
 // Initialize DB
 initializeDB();
+initializeFinancialDB();
 
 function AppContent() {
   const { isAuthenticated, hasPermission, canViewPage } = useAuth();
@@ -106,6 +118,16 @@ function AppContent() {
       case 'inventory': return <Inventory />;
       case 'backup': return <BackupPage />;
       case 'payments': return <Payments />;
+      case 'financial': return <FinancialDashboard />;
+      case 'cashbank': return <CashAndBank />;
+      case 'expenses': return <ExpensesAndIncome />;
+      case 'financialreports': return <FinancialReports />;
+      case 'chartofaccounts': return <ChartOfAccounts />;
+      case 'generalledger': return <GeneralLedger />;
+      case 'checks': return <Checks />;
+      case 'transfers': return <Transfers />;
+      case 'customeraccounts': return <CustomerAccounts />;
+      case 'supplieraccounts': return <SupplierAccounts />;
       default: return <Dashboard />;
     }
   };

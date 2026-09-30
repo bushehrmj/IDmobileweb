@@ -4,7 +4,7 @@ import { db, type Settings } from '../lib/db';
 import {
   LayoutDashboard, ShoppingCart, FileText, Users, Package, Warehouse,
   Truck, Wrench, CreditCard, BarChart3, UserCog, Settings as SettingsIcon,
-  Database, LogOut, Menu, X, Search, Bell, Moon, Sun, ChevronDown, Lock
+  Database, LogOut, Menu, X, Search, Bell, Moon, Sun, ChevronDown, Lock, BookOpen, ArrowRightLeft
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -16,12 +16,21 @@ interface LayoutProps {
 const menuItems = [
   { id: 'dashboard', label: 'داشبورد', icon: LayoutDashboard, permission: 'dashboard.view' },
   { id: 'sales', label: 'فروش', icon: ShoppingCart, permission: 'sales.view' },
-  { id: 'invoices', label: 'فاکتورها', icon: FileText, permission: 'sales.view' },
   { id: 'customers', label: 'مشتریان', icon: Users, permission: 'customers.view' },
   { id: 'products', label: 'محصولات', icon: Package, permission: 'products.view' },
   { id: 'inventory', label: 'انبار', icon: Warehouse, permission: 'inventory.view' },
   { id: 'purchases', label: 'خرید', icon: Truck, permission: 'purchases.view' },
   { id: 'repairs', label: 'تعمیرات', icon: Wrench, permission: 'repairs.view' },
+  { id: 'financial', label: 'داشبورد مالی', icon: BarChart3, permission: 'financial.dashboard' },
+  { id: 'cashbank', label: 'صندوق و بانک', icon: CreditCard, permission: 'financial.cash' },
+  { id: 'expenses', label: 'هزینه و درآمد', icon: CreditCard, permission: 'financial.expenses' },
+  { id: 'financialreports', label: 'گزارش مالی', icon: BarChart3, permission: 'financial.reports' },
+  { id: 'chartofaccounts', label: 'سرفصل حساب‌ها', icon: BookOpen, permission: 'financial.chart_of_accounts' },
+  { id: 'generalledger', label: 'دفتر کل', icon: BookOpen, permission: 'financial.journal' },
+  { id: 'checks', label: 'چک‌ها', icon: FileText, permission: 'financial.reports' },
+  { id: 'transfers', label: 'انتقال بین حساب‌ها', icon: ArrowRightLeft, permission: 'financial.reports' },
+  { id: 'customeraccounts', label: 'حساب مشتریان', icon: Users, permission: 'financial.receivables' },
+  { id: 'supplieraccounts', label: 'حساب تأمین‌کنندگان', icon: Truck, permission: 'financial.payables' },
   { id: 'payments', label: 'پرداخت‌ها', icon: CreditCard, permission: 'reports.view' },
   { id: 'reports', label: 'گزارش‌ها', icon: BarChart3, permission: 'reports.view' },
   { id: 'users', label: 'کاربران', icon: UserCog, permission: 'users.view' },
