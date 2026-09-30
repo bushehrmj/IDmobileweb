@@ -21,6 +21,10 @@ export default function Sales() {
   const [productSearch, setProductSearch] = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: '', brand: '', model: '', barcode: '', sellPrice: 0, buyPrice: 0, stock: 1
+  });
   const [discount, setDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mixed' | 'credit'>('cash');
@@ -136,6 +140,63 @@ export default function Sales() {
 
   const removeFromCart = (id: string) => {
     setCartItems(cartItems.filter(i => i.id !== id));
+  };
+
+  const addNewProduct = () => {
+    if (!newProduct.name.trim()) {
+      showToast('error', 'نام کالا الزامی است');
+      return;
+    }
+    if (!newProduct.sellPrice || newProduct.sellPrice <= 0) {
+      showToast('error', 'قیمت فروش الزامی است');
+      return;
+    }
+
+    const product: Product = {
+      id: uuidv4(),
+      name: newProduct.name,
+      brand: newProduct.brand,
+      model: newProduct.model,
+      category: 'متفرقه',
+      sku: '',
+      barcode: newProduct.barcode || '',
+      imeiRequired: false,
+      serialRequired: false,
+      color: '',
+      storage: '',
+      description: '',
+      buyPrice: newProduct.buyPrice || 0,
+      sellPrice: newProduct.sellPrice,
+      minStock: 1,
+      stock: newProduct.stock || 1,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    db.saveProduct(product);
+
+    // Add to cart
+    const newItem: SaleItem = {
+      id: uuidv4(),
+      productId: product.id,
+      productName: product.name,
+      brand: product.brand,
+      model: product.model,
+      barcode: product.barcode,
+      imei1: '',
+      imei2: '',
+      quantity: 1,
+      buyPrice: hasPermission('sales.view_profit') ? product.buyPrice : 0,
+      sellPrice: product.sellPrice,
+      discount: 0,
+      total: product.sellPrice,
+    };
+    setCartItems([...cartItems, newItem]);
+
+    showToast('success', `${product.name} اضافه و به سبد اضافه شد`);
+    setShowAddProduct(false);
+    setNewProduct({ name: '', brand: '', model: '', barcode: '', sellPrice: 0, buyPrice: 0, stock: 1 });
   };
 
   const submitSale = () => {
@@ -304,6 +365,9 @@ export default function Sales() {
             </div>
             <button onClick={() => setShowProductSearch(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
               <Search size={16} /> کالا
+            </button>
+            <button onClick={() => setShowAddProduct(true)} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm flex items-center gap-1">
+              <Plus size={16} /> کالای جدید
             </button>
           </div>
           <div className="flex gap-2 mt-2">
@@ -509,6 +573,62 @@ export default function Sales() {
         )}
 
         {printSaleId && <InvoicePrint saleId={printSaleId} onClose={() => setPrintSaleId(null)} />}
+
+        {/* Add New Product Modal */}
+        {showAddProduct && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <h3 className="font-bold">افزودن کالای جدید</h3>
+                <button onClick={() => setShowAddProduct(false)} className="text-slate-500"><X size={20} /></button>
+              </div>
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="text-xs text-slate-500">نام کالا *</label>
+                  <input type="text" value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" autoFocus />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-500">برند</label>
+                    <input type="text" value={newProduct.brand} onChange={e => setNewProduct({ ...newProduct, brand: e.target.value })}
+                      className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500">مدل</label>
+                    <input type="text" value={newProduct.model} onChange={e => setNewProduct({ ...newProduct, model: e.target.value })}
+                      className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500">بارکد</label>
+                  <input type="text" value={newProduct.barcode} onChange={e => setNewProduct({ ...newProduct, barcode: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-500">قیمت خرید</label>
+                    <input type="number" value={newProduct.buyPrice} onChange={e => setNewProduct({ ...newProduct, buyPrice: Number(e.target.value) })}
+                      className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500">قیمت فروش *</label>
+                    <input type="number" value={newProduct.sellPrice} onChange={e => setNewProduct({ ...newProduct, sellPrice: Number(e.target.value) })}
+                      className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500">موجودی اولیه</label>
+                  <input type="number" value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: Number(e.target.value) })}
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+                </div>
+                <button onClick={addNewProduct} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium">
+                  افزودن و اضافه به سبد
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

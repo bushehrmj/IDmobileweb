@@ -173,7 +173,7 @@ export default function Repairs() {
       createdAt: editRepair?.createdAt || new Date().toISOString(),
     };
 
-    // اگر وضعیت به delivered تغییر کرد، قطعات از انبار کم شود
+    // اگر وضعیت به delivered تغییر کرد، قطعات از انبار کم شود و فاکتور فروش ایجاد شود
     if (editRepair && editRepair.status !== 'delivered' && repair.status === 'delivered') {
       repair.parts.forEach(part => {
         if (part.productId) {
@@ -205,6 +205,98 @@ export default function Repairs() {
           }
         }
       });
+
+      // ایجاد فاکتور فروش برای اجرت و قطعات
+      if (repair.totalCost > 0) {
+        // پیدا کردن یا ایجاد مشتری پیش‌فرض برای تعمیرات
+        let repairCustomer = db.getCustomers().find(c => c.firstName === 'مشتری' && c.lastName === 'تعمیرات');
+        if (!repairCustomer) {
+          repairCustomer = {
+            id: uuidv4(),
+            firstName: 'مشتری',
+            lastName: 'تعمیرات',
+            mobile: repair.customerMobile || '',
+            nationalId: '',
+            address: '',
+            notes: '',
+            totalPurchase: 0,
+            totalPaid: 0,
+            debt: 0,
+            invoiceCount: 0,
+            createdAt: new Date().toISOString(),
+          };
+          db.saveCustomer(repairCustomer);
+        }
+
+        // ایجاد آیتم‌های فاکتور
+        const saleItems: any[] = [];
+        
+        // اضافه کردن قطعات
+        repair.parts.forEach(part => {
+          const product = part.productId ? db.getProduct(part.productId) : db.getProducts().find(p => p.name === part.productName);
+          saleItems.push({
+            id: uuidv4(),
+            productId: product?.id || '',
+            productName: part.productName,
+            brand: '',
+            model: '',
+            barcode: '',
+            imei1: '',
+            imei2: '',
+            quantity: part.quantity,
+            buyPrice: product?.buyPrice || 0,
+            sellPrice: part.price,
+            discount: 0,
+            total: part.total,
+          });
+        });
+
+        // اضافه کردن اجرت به عنوان یک آیتم
+        if (repair.labor > 0) {
+          saleItems.push({
+            id: uuidv4(),
+            productId: '',
+            productName: 'اجرت تعمیر',
+            brand: '',
+            model: '',
+            barcode: '',
+            imei1: '',
+            imei2: '',
+            quantity: 1,
+            buyPrice: 0,
+            sellPrice: repair.labor,
+            discount: 0,
+            total: repair.labor,
+          });
+        }
+
+        // ایجاد فاکتور فروش
+        const sale = {
+          id: uuidv4(),
+          invoiceNumber: db.getNextInvoiceNumber(),
+          date: new Date().toISOString(),
+          time: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+          customerId: repairCustomer.id,
+          customerName: repair.customerName,
+          sellerId: user?.id || '',
+          sellerName: user?.fullName || '',
+          items: saleItems,
+          subtotal: repair.totalCost,
+          discount: 0,
+          discountType: 'amount' as const,
+          tax: 0,
+          total: repair.totalCost,
+          paid: repair.paid,
+          remaining: repair.remaining,
+          paymentMethod: repair.paid >= repair.totalCost ? 'cash' as const : 'credit' as const,
+          status: 'completed' as const,
+          notes: `فاکتور تعمیر شماره ${repair.ticketNumber} - ${repair.device} ${repair.brand} ${repair.model}`,
+          createdAt: new Date().toISOString(),
+        };
+
+        db.saveSale(sale);
+        showToast('success', `فاکتور فروش #${sale.invoiceNumber} برای تعمیر ایجاد شد`);
+      }
     }
 
     db.saveRepair(repair);

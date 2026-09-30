@@ -26,6 +26,7 @@ import Checks from './pages/Checks';
 import Transfers from './pages/Transfers';
 import CustomerAccounts from './pages/CustomerAccounts';
 import SupplierAccounts from './pages/SupplierAccounts';
+import ComprehensiveFinancialReport from './pages/ComprehensiveFinancialReport';
 import { Shield, FileWarning } from 'lucide-react';
 
 // Initialize DB
@@ -83,6 +84,7 @@ function AppContent() {
     transfers: 'financial.reports',
     customeraccounts: 'financial.receivables',
     supplieraccounts: 'financial.payables',
+    comprehensivereport: 'financial.reports',
   };
 
   const requiredPermission = pagePermissionMap[currentPage];
@@ -146,6 +148,7 @@ function AppContent() {
       case 'transfers': return <Transfers />;
       case 'customeraccounts': return <CustomerAccounts />;
       case 'supplieraccounts': return <SupplierAccounts />;
+      case 'comprehensivereport': return <ComprehensiveFinancialReport />;
       default: return <Dashboard />;
     }
   };
