@@ -93,7 +93,9 @@ function AppContent() {
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard': return <Dashboard />;
-      case 'sales': case 'invoices': case 'proformas': return <Sales />;
+      case 'sales': return <Sales />;
+      case 'invoices': return <Sales />;
+      case 'proformas': return <Sales />;
       case 'products': return <Products />;
       case 'customers': return <Customers />;
       case 'repairs': return <Repairs />;

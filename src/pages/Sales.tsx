@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, useToast, formatCurrency, toJalali, getTimeStr } from '../lib/auth';
 import { db, type Product, type Customer, type Sale, type SaleItem } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Search, Trash2, Printer, ShoppingCart, X, UserPlus, ScanBarcode, Eye } from 'lucide-react';
+import { Plus, Search, Trash2, Printer, ShoppingCart, X, UserPlus, ScanBarcode, Eye, Check } from 'lucide-react';
 import InvoicePrint from '../components/InvoicePrint';
 
 export default function Sales() {
@@ -12,6 +12,7 @@ export default function Sales() {
   const [view, setView] = useState<'list' | 'new'>('list');
   const [sales, setSales] = useState<Sale[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
 
   // New sale state
   const [cartItems, setCartItems] = useState<SaleItem[]>([]);
@@ -24,6 +25,7 @@ export default function Sales() {
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mixed' | 'credit'>('cash');
   const [paidAmount, setPaidAmount] = useState(0);
+  const [fullPayment, setFullPayment] = useState(true);
   const [saleNotes, setSaleNotes] = useState('');
   const [imeiInput, setImeiInput] = useState('');
   const [printSaleId, setPrintSaleId] = useState<string | null>(null);
@@ -34,8 +36,14 @@ export default function Sales() {
   }, []);
 
   const loadSales = () => {
-    setSales(db.getSales().filter(s => s.status !== 'proforma').reverse());
+    const allSales = db.getSales().filter(s => s.status !== 'proforma');
+    const filtered = statusFilter === 'all' ? allSales : allSales.filter(s => s.status === statusFilter);
+    setSales(filtered.reverse());
   };
+
+  useEffect(() => {
+    loadSales();
+  }, [statusFilter]);
 
   const filteredSales = sales.filter(s =>
     s.invoiceNumber.includes(searchTerm) || s.customerName.includes(searchTerm)
@@ -47,14 +55,19 @@ export default function Sales() {
   const total = subtotal - discountAmount + tax;
   const remaining = total - paidAmount;
 
-  const addProductToCart = (product: Product, imei?: string) => {
+  const addProductToCart = (product: Product, imei?: string, quantity: number = 1) => {
     if (product.stock <= 0 && !product.imeiRequired) {
       showToast('error', 'موجودی کافی نیست');
       return;
     }
+    if (product.stock < quantity && !product.imeiRequired) {
+      showToast('error', `موجودی کافی نیست (موجودی: ${product.stock})`);
+      return;
+    }
     const existing = cartItems.find(i => i.productId === product.id && !i.imei1);
     if (existing && !product.imeiRequired) {
-      setCartItems(cartItems.map(i => i.id === existing.id ? { ...i, quantity: i.quantity + 1, total: (i.quantity + 1) * i.sellPrice } : i));
+      const newQty = existing.quantity + quantity;
+      setCartItems(cartItems.map(i => i.id === existing.id ? { ...i, quantity: newQty, total: newQty * i.sellPrice } : i));
     } else {
       const newItem: SaleItem = {
         id: uuidv4(),
@@ -65,17 +78,34 @@ export default function Sales() {
         barcode: product.barcode,
         imei1: imei || '',
         imei2: '',
-        quantity: 1,
+        quantity: quantity,
         buyPrice: hasPermission('sales.view_profit') ? product.buyPrice : 0,
         sellPrice: product.sellPrice,
         discount: 0,
-        total: product.sellPrice,
+        total: product.sellPrice * quantity,
       };
       setCartItems([...cartItems, newItem]);
     }
     setShowProductSearch(false);
     setProductSearch('');
-    showToast('success', `${product.name} اضافه شد`);
+    showToast('success', `${product.name} (${quantity} عدد) اضافه شد`);
+  };
+
+  const updateCartItemQuantity = (itemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(itemId);
+      return;
+    }
+    const item = cartItems.find(i => i.id === itemId);
+    if (!item) return;
+    
+    const product = db.getProduct(item.productId);
+    if (product && product.stock < newQuantity && !item.imei1) {
+      showToast('error', `موجودی کافی نیست (موجودی: ${product.stock})`);
+      return;
+    }
+    
+    setCartItems(cartItems.map(i => i.id === itemId ? { ...i, quantity: newQuantity, total: newQuantity * i.sellPrice } : i));
   };
 
   const handleBarcodeScan = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -136,6 +166,9 @@ export default function Sales() {
       }
     }
 
+    const finalPaid = fullPayment ? total : paidAmount;
+    const finalRemaining = fullPayment ? 0 : Math.max(0, total - paidAmount);
+
     const sale: Sale = {
       id: uuidv4(),
       invoiceNumber: db.getNextInvoiceNumber(),
@@ -151,8 +184,8 @@ export default function Sales() {
       discountType,
       tax,
       total,
-      paid: paidAmount,
-      remaining: remaining > 0 ? remaining : 0,
+      paid: finalPaid,
+      remaining: finalRemaining,
       paymentMethod,
       status: 'completed',
       notes: saleNotes,
@@ -229,6 +262,7 @@ export default function Sales() {
     setSelectedCustomer(null);
     setDiscount(0);
     setPaidAmount(0);
+    setFullPayment(true);
     setSaleNotes('');
     setPaymentMethod('cash');
   };
@@ -360,9 +394,19 @@ export default function Sales() {
                     <p className="text-xs text-slate-500">
                       {item.brand} {item.model} {item.imei1 && `| IMEI: ${item.imei1}`}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      تعداد: {item.quantity} × {formatCurrency(item.sellPrice, settings.currency)}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-slate-500">تعداد:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={e => updateCartItemQuantity(item.id, Number(e.target.value))}
+                        className="w-16 px-2 py-1 border border-slate-200 dark:border-slate-600 rounded text-xs bg-white dark:bg-slate-700"
+                        disabled={!!item.imei1}
+                      />
+                      <span className="text-xs text-slate-500">×</span>
+                      <span className="text-xs">{formatCurrency(item.sellPrice, settings.currency)}</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold">{formatCurrency(item.total, settings.currency)}</p>
@@ -411,12 +455,27 @@ export default function Sales() {
             </div>
             <div>
               <label className="text-xs text-slate-500">مبلغ پرداختی</label>
-              <input type="number" value={paidAmount} onChange={e => setPaidAmount(Number(e.target.value))}
-                className="w-full mt-1 px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded text-sm bg-slate-50 dark:bg-slate-700" />
+              <input type="number" value={paidAmount} onChange={e => { setPaidAmount(Number(e.target.value)); setFullPayment(false); }}
+                disabled={fullPayment}
+                className="w-full mt-1 px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded text-sm bg-slate-50 dark:bg-slate-700 disabled:opacity-50" />
             </div>
           </div>
 
-          {remaining > 0 && (
+          <label className="flex items-center gap-2 text-sm cursor-pointer bg-green-50 dark:bg-green-900/20 p-2 rounded-lg">
+            <input
+              type="checkbox"
+              checked={fullPayment}
+              onChange={e => {
+                setFullPayment(e.target.checked);
+                if (e.target.checked) setPaidAmount(total);
+              }}
+              className="rounded"
+            />
+            <Check size={16} className="text-green-600" />
+            <span className="font-medium">تسویه کامل</span>
+          </label>
+
+          {!fullPayment && remaining > 0 && (
             <div className="bg-red-50 dark:bg-red-900/20 p-2 rounded-lg text-sm text-red-700 dark:text-red-400">
               مانده: {formatCurrency(remaining, settings.currency)}
             </div>
@@ -491,7 +550,7 @@ export default function Sales() {
   return (
     <div className="space-y-4 pb-20 lg:pb-0">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">فاکتورهای فروش</h2>
+        <h2 className="text-lg font-bold">فروش و فاکتورها</h2>
         {hasPermission('sales.create') && (
           <button onClick={() => setView('new')} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
             <Plus size={16} /> فروش جدید
@@ -499,8 +558,16 @@ export default function Sales() {
         )}
       </div>
 
-      <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-        placeholder="جستجو شماره فاکتور یا مشتری..." className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
+      <div className="flex gap-2 flex-wrap">
+        <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+          placeholder="جستجو شماره فاکتور یا مشتری..." className="flex-1 min-w-[200px] px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+          className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800">
+          <option value="all">همه فاکتورها</option>
+          <option value="completed">تکمیل شده</option>
+          <option value="cancelled">لغو شده</option>
+        </select>
+      </div>
 
       <div className="space-y-2">
         {filteredSales.map(sale => (

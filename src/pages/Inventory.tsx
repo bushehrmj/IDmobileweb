@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, useToast, formatCurrency, toJalaliFull } from '../lib/auth';
 import { db, type StockMovement } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Package, ArrowDown, ArrowUp, Search, Filter } from 'lucide-react';
+import { Package, ArrowDown, ArrowUp, Search, Filter, Download, Printer, FileSpreadsheet } from 'lucide-react';
 
 export default function Inventory() {
   const { user, hasPermission } = useAuth();
@@ -64,15 +64,123 @@ export default function Inventory() {
   const totalValue = hasPermission('sales.view_profit') ? products.reduce((s, p) => s + p.buyPrice * p.stock, 0) : 0;
   const lowStockCount = products.filter(p => p.stock <= p.minStock && p.minStock > 0).length;
 
+  const exportToExcel = () => {
+    const filteredProducts = search
+      ? products.filter(p => p.name.includes(search) || p.brand.includes(search) || p.barcode?.includes(search))
+      : products;
+    
+    const headers = ['نام کالا', 'برند', 'مدل', 'بارکد', 'موجودی', 'قیمت خرید', 'قیمت فروش', 'حداقل موجودی', 'وضعیت'];
+    const rows = filteredProducts.map(p => [
+      p.name,
+      p.brand,
+      p.model,
+      p.barcode || '',
+      p.stock.toString(),
+      p.buyPrice.toString(),
+      p.sellPrice.toString(),
+      p.minStock.toString(),
+      p.status === 'active' ? 'فعال' : 'غیرفعال'
+    ]);
+    
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('success', 'فایل اکسل دانلود شد');
+  };
+
+  const printInventory = () => {
+    const filteredProducts = search
+      ? products.filter(p => p.name.includes(search) || p.brand.includes(search) || p.barcode?.includes(search))
+      : products;
+    
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) return;
+    
+    const html = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="fa">
+      <head>
+        <meta charset="UTF-8">
+        <title>گزارش انبار</title>
+        <style>
+          body { font-family: Tahoma, Arial, sans-serif; padding: 20px; direction: rtl; }
+          h1 { text-align: center; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .info { margin-bottom: 10px; }
+        </style>
+      </head>
+      <body>
+        <h1>گزارش موجودی انبار</h1>
+        <div class="info">
+          <p>تاریخ: ${new Date().toLocaleDateString('fa-IR')}</p>
+          <p>تعداد کل کالاها: ${filteredProducts.length}</p>
+          <p>موجودی کل: ${totalStock}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ردیف</th>
+              <th>نام کالا</th>
+              <th>برند</th>
+              <th>مدل</th>
+              <th>بارکد</th>
+              <th>موجودی</th>
+              <th>قیمت خرید</th>
+              <th>قیمت فروش</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredProducts.map((p, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${p.name}</td>
+                <td>${p.brand}</td>
+                <td>${p.model}</td>
+                <td>${p.barcode || '-'}</td>
+                <td>${p.stock}</td>
+                <td>${formatCurrency(p.buyPrice, settings.currency)}</td>
+                <td>${formatCurrency(p.sellPrice, settings.currency)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  };
+
   return (
     <div className="space-y-4 pb-20 lg:pb-0">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-bold">انبار</h2>
-        {hasPermission('inventory.adjust') && (
-          <button onClick={() => setShowAdjust(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
-            <Package size={16} /> اصلاح موجودی
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={exportToExcel} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm flex items-center gap-1">
+            <FileSpreadsheet size={16} /> خروجی اکسل
           </button>
-        )}
+          <button onClick={printInventory} className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm flex items-center gap-1">
+            <Printer size={16} /> چاپ گزارش
+          </button>
+          {hasPermission('inventory.adjust') && (
+            <button onClick={() => setShowAdjust(true)} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
+              <Package size={16} /> اصلاح موجودی
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary */}

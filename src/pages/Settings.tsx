@@ -33,7 +33,7 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: 'store', label: 'فروشگاه', show: true },
-    { id: 'invoice', label: 'فاکتور', show: true },
+    { id: 'invoice', label: 'تنظیمات فاکتور', show: true },
     { id: 'security', label: 'امنیت', show: hasPermission('settings.edit') },
     { id: 'network', label: 'شبکه', show: hasPermission('settings.view') },
     { id: 'logs', label: 'لاگ‌ها', show: hasPermission('settings.view') },
@@ -127,10 +127,11 @@ export default function SettingsPage() {
       )}
 
       {activeTab === 'invoice' && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 space-y-3">
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 space-y-4">
+          <h3 className="font-bold text-sm border-b border-slate-200 dark:border-slate-700 pb-2">شماره‌گذاری</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-slate-500">شروع شماره فاکتور</label>
+              <label className="text-xs text-slate-500">شروع شماره فاکتور فروش</label>
               <input type="number" value={settings.invoiceStartNumber} onChange={e => setSettings({ ...settings, invoiceStartNumber: Number(e.target.value) })}
                 className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
             </div>
@@ -140,7 +141,43 @@ export default function SettingsPage() {
                 className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
             </div>
           </div>
-          <button onClick={save} className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium">ذخیره</button>
+
+          <h3 className="font-bold text-sm border-b border-slate-200 dark:border-slate-700 pb-2 pt-2">چاپ فاکتور</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500">سایز کاغذ</label>
+              <select value={settings.paperSize} onChange={e => setSettings({ ...settings, paperSize: e.target.value as Settings['paperSize'] })}
+                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700">
+                <option value="80mm">80mm (رسید حرارتی)</option>
+                <option value="a5">A5</option>
+                <option value="a4">A4</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-500">درصد مالیات (%)</label>
+              <input type="number" value={settings.taxRate} onChange={e => setSettings({ ...settings, taxRate: Number(e.target.value) })}
+                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+            </div>
+          </div>
+
+          <h3 className="font-bold text-sm border-b border-slate-200 dark:border-slate-700 pb-2 pt-2">متن فاکتور</h3>
+          <div>
+            <label className="text-xs text-slate-500">پیام پایین فاکتور</label>
+            <textarea value={settings.storeDescription} onChange={e => setSettings({ ...settings, storeDescription: e.target.value })}
+              className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" rows={3}
+              placeholder="مثلاً: از خرید شما متشکریم - گارانتی 7 روزه" />
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-xs text-blue-700 dark:text-blue-300">
+            <p className="font-bold mb-1">💡 راهنما:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>سایز 80mm برای چاپگر حرارتی مناسب است</li>
+              <li>سایز A5 و A4 برای فاکتورهای رسمی</li>
+              <li>پیام پایین فاکتور در تمام فاکتورها نمایش داده می‌شود</li>
+            </ul>
+          </div>
+
+          <button onClick={save} className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium">ذخیره تنظیمات فاکتور</button>
         </div>
       )}
 

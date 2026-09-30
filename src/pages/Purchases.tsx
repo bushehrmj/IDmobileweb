@@ -28,6 +28,57 @@ export default function Purchases() {
     setItems([...items, { id: uuidv4(), productId: '', productName: '', quantity: 1, buyPrice: 0, total: 0, imeis: [] }]);
   };
 
+  const addManualProduct = () => {
+    const name = prompt('نام کالا:');
+    if (!name) return;
+    const brand = prompt('برند:', '') || '';
+    const model = prompt('مدل:', '') || '';
+    const qtyStr = prompt('تعداد:', '1');
+    if (!qtyStr) return;
+    const quantity = parseInt(qtyStr) || 1;
+    const priceStr = prompt('قیمت خرید:', '0');
+    if (!priceStr) return;
+    const buyPrice = parseInt(priceStr) || 0;
+    
+    // ایجاد محصول جدید
+    const newProduct = {
+      id: uuidv4(),
+      name,
+      brand,
+      model,
+      category: 'موبایل',
+      sku: '',
+      barcode: '',
+      imeiRequired: false,
+      serialRequired: false,
+      color: '',
+      storage: '',
+      description: '',
+      buyPrice,
+      sellPrice: Math.round(buyPrice * 1.15),
+      minStock: 1,
+      stock: 0,
+      status: 'active' as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    db.saveProduct(newProduct as any);
+    
+    // اضافه کردن به لیست خرید
+    setItems([...items, {
+      id: uuidv4(),
+      productId: newProduct.id,
+      productName: name,
+      quantity,
+      buyPrice,
+      total: buyPrice * quantity,
+      imeis: []
+    }]);
+    
+    showToast('success', `${name} ایجاد و اضافه شد`);
+  };
+
   const updateItem = (idx: number, field: string, value: unknown) => {
     const newItems = [...items];
     (newItems[idx] as unknown as Record<string, unknown>)[field] = value;
@@ -181,7 +232,10 @@ export default function Purchases() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-bold">کالاها</label>
-                  <button onClick={addItem} className="text-xs text-blue-600">+ افزودن</button>
+                  <div className="flex gap-2">
+                    <button onClick={addManualProduct} className="text-xs text-green-600">+ کالای جدید</button>
+                    <button onClick={addItem} className="text-xs text-blue-600">+ افزودن از لیست</button>
+                  </div>
                 </div>
                 {items.map((item, idx) => (
                   <div key={item.id} className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg mb-2 space-y-2">

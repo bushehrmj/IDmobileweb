@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, useToast, formatCurrency } from '../lib/auth';
 import { db, type Product, type ProductSerial } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Search, Edit, Trash2, X, Package, Barcode } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Package, Barcode, TrendingUp, TrendingDown, History } from 'lucide-react';
 
 export default function Products() {
   const { hasPermission, user } = useAuth();
@@ -134,12 +134,29 @@ export default function Products() {
                 </div>
                 <p className="text-xs text-slate-500 mt-1">{p.brand} {p.model} {p.color && `| ${p.color}`} {p.storage && `| ${p.storage}`}</p>
                 {p.barcode && <p className="text-xs text-slate-400 mt-0.5">بارکد: {p.barcode}</p>}
-                <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-4 mt-2 flex-wrap">
                   <span className="text-sm font-bold text-blue-600">{formatCurrency(p.sellPrice, settings.currency)}</span>
                   {hasPermission('sales.view_profit') && (
-                    <span className="text-xs text-slate-500">خرید: {formatCurrency(p.buyPrice, settings.currency)}</span>
+                    <>
+                      <span className="text-xs text-slate-500">خرید: {formatCurrency(p.buyPrice, settings.currency)}</span>
+                      {p.sellPrice > p.buyPrice && (
+                        <span className="text-xs text-green-600 flex items-center gap-1">
+                          <TrendingUp size={10} />
+                          سود: {formatCurrency(p.sellPrice - p.buyPrice, settings.currency)}
+                        </span>
+                      )}
+                    </>
                   )}
-                  <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">موجودی: {p.stock}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${
+                    p.stock === 0 ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                    p.stock <= p.minStock ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' :
+                    'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                  }`}>
+                    موجودی: {p.stock}
+                  </span>
+                  {p.dollarRateAtPurchase && p.dollarRateAtPurchase > 0 && (
+                    <span className="text-xs text-slate-400">دلار: {formatCurrency(p.dollarRateAtPurchase, '')}</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1">
