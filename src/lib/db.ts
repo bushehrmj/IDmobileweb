@@ -147,33 +147,251 @@ export interface PurchaseItem {
 export interface Repair {
   id: string;
   ticketNumber: string;
+  
+  // اطلاعات مشتری
   customerName: string;
   customerMobile: string;
+  customerMobile2?: string;
+  customerNationalId?: string;
+  customerAddress?: string;
+  customerNotes?: string;
+  
+  // اطلاعات دستگاه
+  deviceType: 'mobile' | 'tablet' | 'watch' | 'laptop' | 'other';
   device: string;
   brand: string;
   model: string;
-  imei: string;
-  serial: string;
   color: string;
-  physicalCondition: string;
-  accessories: string;
-  devicePassword: string;
+  storage?: string;
+  ram?: string;
+  imei: string;
+  imei2?: string;
+  serial: string;
+  
+  // وضعیت ظاهری
+  physicalCondition: PhysicalConditionChecklist;
+  
+  // عکس‌ها
+  photos?: DevicePhoto[];
+  
+  // لوازم همراه
+  accessories: AccessoriesChecklist;
+  
+  // اطلاعات نرم‌افزاری
+  devicePassword?: string;
+  passwordType?: 'pattern' | 'pin' | 'faceid' | 'touchid' | 'none';
+  passwordProvided: boolean;
+  devicePowerStatus?: 'on' | 'off';
+  
+  // سیم‌کارت و حافظه
+  sim1?: boolean;
+  sim2?: boolean;
+  memoryCard?: boolean;
+  
+  // ایراد و تشخیص
   reportedIssue: string;
+  initialAssessment?: string;
   diagnosis: string;
+  
+  // تست اولیه
+  initialTests?: TestChecklist;
+  testNotPerformedReason?: string;
+  
+  // خدمات
+  requestedServices: string[];
+  otherServiceDescription?: string;
+  
+  // هزینه
+  estimatedPartsCost: number;
+  estimatedLabor: number;
+  estimatedExtraCost: number;
+  estimatedTotal: number;
+  customerCostApproval?: CostApproval;
+  
+  // قطعات و هزینه نهایی
   parts: RepairPart[];
   labor: number;
   partsCost: number;
   extraCost: number;
   totalCost: number;
+  discount: number;
+  finalTotal: number;
+  
+  // پرداخت
   paid: number;
   remaining: number;
+  paymentMethod: 'cash' | 'card' | 'transfer' | 'bank' | 'check' | 'credit';
+  
+  // گارانتی
+  warranty?: WarrantyInfo;
+  
+  // امضاها
+  signatures?: RepairSignatures;
+  
+  // تأییدها
+  confirmations: RepairConfirmations;
+  
+  // هشدارها
+  warnings: RepairWarnings;
+  
+  // زمان تحویل
+  estimatedDeliveryDate?: string;
+  deliveryDate?: string;
+  deliveryTime?: string;
+  
+  // وضعیت
+  status: RepairStatus;
   technicianId: string;
   technicianName: string;
-  status: 'received' | 'waiting_check' | 'repairing' | 'waiting_part' | 'ready' | 'delivered' | 'cancelled';
+  
+  // تاریخچه
   entryDate: string;
-  deliveryDate?: string;
+  entryTime: string;
+  history?: RepairHistoryEntry[];
+  
   notes: string;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PhysicalConditionChecklist {
+  screen: ConditionStatus;
+  backCover: ConditionStatus;
+  frame: ConditionStatus;
+  edges: ConditionStatus;
+  camera: ConditionStatus;
+  cameraLens: ConditionStatus;
+  chargingPort: ConditionStatus;
+  speaker: ConditionStatus;
+  microphone: ConditionStatus;
+  buttons: ConditionStatus;
+  simTray: ConditionStatus;
+  battery: ConditionStatus;
+  waterDamage: boolean;
+  impactDamage: boolean;
+  previouslyOpened: boolean;
+  previouslyReplacedParts: boolean;
+  glueOrCracks: boolean;
+}
+
+export type ConditionStatus = 'healthy' | 'scratched' | 'broken' | 'damaged' | 'unknown';
+
+export interface DevicePhoto {
+  id: string;
+  type: 'front' | 'back' | 'right' | 'left' | 'top' | 'bottom' | 'imei';
+  data: string; // base64
+  timestamp: string;
+}
+
+export interface AccessoriesChecklist {
+  phone: boolean;
+  case: boolean;
+  charger: boolean;
+  cable: boolean;
+  simCard: boolean;
+  memoryCard: boolean;
+  stylus: boolean;
+  headphones: boolean;
+  box: boolean;
+  other: boolean;
+  otherDescription?: string;
+}
+
+export interface TestChecklist {
+  power: TestStatus;
+  touch: TestStatus;
+  display: TestStatus;
+  backlight: TestStatus;
+  charging: TestStatus;
+  camera: TestStatus;
+  flash: TestStatus;
+  microphone: TestStatus;
+  speaker: TestStatus;
+  earpiece: TestStatus;
+  wifi: TestStatus;
+  bluetooth: TestStatus;
+  sim: TestStatus;
+  mobileNetwork: TestStatus;
+  fingerprint: TestStatus;
+  faceId: TestStatus;
+  buttons: TestStatus;
+  vibration: TestStatus;
+  proximitySensor: TestStatus;
+  gps: TestStatus;
+  nfc: TestStatus;
+  battery: TestStatus;
+}
+
+export type TestStatus = 'passed' | 'failed' | 'not_tested' | 'not_testable';
+
+export interface CostApproval {
+  approved: boolean;
+  date: string;
+  time: string;
+  approvedBy: string;
+  method: 'in_person' | 'phone' | 'sms' | 'other';
+  notes?: string;
+}
+
+export interface WarrantyInfo {
+  hasWarranty: boolean;
+  duration: number; // days
+  startDate: string;
+  endDate: string;
+  coveredParts: string[];
+  coveredServices: string[];
+  excludedItems: string[];
+  terms: string;
+}
+
+export interface RepairSignatures {
+  customerSignature?: string; // base64
+  acceptanceSignature?: string;
+  technicianSignature?: string;
+  customerSignatureDate?: string;
+}
+
+export interface RepairConfirmations {
+  conditionChecked: boolean;
+  accessoriesRegistered: boolean;
+  issueReported: boolean;
+  costEstimated: boolean;
+  dataLossInformed: boolean;
+  warrantyInformed: boolean;
+  receiptReceived: boolean;
+  serviceAgreed: boolean;
+}
+
+export interface RepairWarnings {
+  waterDamageWarning: boolean;
+  boardRepairWarning: boolean;
+  previouslyOpenedWarning: boolean;
+  dataBackupWarning: boolean;
+  partsAvailabilityWarning: boolean;
+}
+
+export type RepairStatus = 
+  | 'received'
+  | 'waiting_check'
+  | 'diagnosing'
+  | 'waiting_customer_approval'
+  | 'repairing'
+  | 'waiting_part'
+  | 'completed'
+  | 'ready_for_delivery'
+  | 'delivered'
+  | 'cancelled'
+  | 'not_repairable';
+
+export interface RepairHistoryEntry {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  action: string;
+  oldValue?: string;
+  newValue?: string;
+  notes?: string;
 }
 
 export interface RepairPart {

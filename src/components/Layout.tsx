@@ -68,7 +68,7 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
     const products = db.getProducts();
     const lowStock = products.filter(p => p.stock <= p.minStock && p.minStock > 0);
     if (lowStock.length > 0) notifs.push(`${lowStock.length} کالا موجودی کم دارد`);
-    const repairs = db.getRepairs().filter(r => r.status === 'ready');
+    const repairs = db.getRepairs().filter(r => r.status === 'ready_for_delivery');
     if (repairs.length > 0) notifs.push(`${repairs.length} تعمیر آماده تحویل`);
     const customers = db.getCustomers().filter(c => c.debt > 0);
     if (customers.length > 0) notifs.push(`${customers.length} مشتری بدهکار`);
