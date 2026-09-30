@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, useToast, formatCurrency, toJalali, getTimeStr } from '../lib/auth';
 import { db, type Product, type Customer, type Sale, type SaleItem } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Search, Trash2, Printer, ShoppingCart, X, UserPlus, ScanBarcode } from 'lucide-react';
+import { Plus, Search, Trash2, Printer, ShoppingCart, X, UserPlus, ScanBarcode, Eye } from 'lucide-react';
+import InvoicePrint from '../components/InvoicePrint';
 
 export default function Sales() {
   const { user, hasPermission } = useAuth();
@@ -25,6 +26,7 @@ export default function Sales() {
   const [paidAmount, setPaidAmount] = useState(0);
   const [saleNotes, setSaleNotes] = useState('');
   const [imeiInput, setImeiInput] = useState('');
+  const [printSaleId, setPrintSaleId] = useState<string | null>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -219,6 +221,7 @@ export default function Sales() {
     resetForm();
     setView('list');
     loadSales();
+    setPrintSaleId(sale.id);
   };
 
   const resetForm = () => {
@@ -516,15 +519,27 @@ export default function Sales() {
                 </span>
               </div>
             </div>
-            {hasPermission('sales.cancel') && sale.status === 'completed' && (
-              <button onClick={() => cancelSale(sale.id)} className="mt-2 text-xs text-red-500 hover:text-red-700">لغو فاکتور</button>
-            )}
+            <div className="flex items-center gap-2 mt-2">
+              {hasPermission('sales.print') && (
+                <button onClick={() => setPrintSaleId(sale.id)} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1">
+                  <Eye size={12} /> مشاهده/چاپ
+                </button>
+              )}
+              {hasPermission('sales.cancel') && sale.status === 'completed' && (
+                <button onClick={() => cancelSale(sale.id)} className="text-xs text-red-500 hover:text-red-700">لغو فاکتور</button>
+              )}
+            </div>
           </div>
         ))}
         {filteredSales.length === 0 && (
           <p className="text-center text-slate-500 py-8">فاکتوری یافت نشد</p>
         )}
       </div>
+
+      {/* Invoice Print Modal */}
+      {printSaleId && (
+        <InvoicePrint saleId={printSaleId} onClose={() => setPrintSaleId(null)} />
+      )}
     </div>
   );
 }
