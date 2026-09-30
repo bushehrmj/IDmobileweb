@@ -333,8 +333,8 @@ export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps
         return true;
       
       case 2: // دستگاه
-        if (!form.device?.trim()) {
-          showToast('error', 'نام دستگاه الزامی است');
+        if (!form.model?.trim()) {
+          showToast('error', 'مدل دستگاه الزامی است');
           return false;
         }
         return true;
@@ -489,13 +489,24 @@ export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps
               </div>
               
               <div>
+                <label className="block text-sm font-medium mb-1">نام دستگاه *</label>
+                <input
+                  type="text"
+                  value={form.device}
+                  onChange={e => updateField('device', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="مثال: iPhone"
+                />
+              </div>
+              
+              <div>
                 <label className="block text-sm font-medium mb-1">مدل *</label>
                 <input
                   type="text"
                   value={form.model}
                   onChange={e => updateField('model', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="مثال: iPhone 13 Pro Max"
+                  placeholder="مثال: 13 Pro Max"
                 />
               </div>
               
