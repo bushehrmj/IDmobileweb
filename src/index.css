@@ -1,1 +1,106 @@
 @import "tailwindcss";
+
+@theme {
+  --font-vazir: 'Vazirmatn', Tahoma, Arial, sans-serif;
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+}
+
+* {
+  font-family: 'Vazirmatn', Tahoma, Arial, sans-serif;
+}
+
+body {
+  direction: rtl;
+  background-color: #f8fafc;
+  min-height: 100vh;
+}
+
+.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+/* Print styles */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  body { background: white !important; }
+  @page { margin: 10mm; }
+}
+
+/* Invoice print sizes */
+.invoice-80mm { width: 80mm; padding: 3mm; font-size: 11px; }
+.invoice-a5 { width: 148mm; padding: 10mm; }
+.invoice-a4 { width: 210mm; padding: 15mm; }
+
+/* Animations */
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-slide-in { animation: slideIn 0.3s ease-out; }
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+
+/* Touch friendly */
+@media (max-width: 768px) {
+  button, input, select, textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+/* Card hover */
+.card-hover {
+  transition: all 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+}
+
+/* Table responsive */
+@media (max-width: 768px) {
+  .table-responsive { display: block; }
+  .table-responsive thead { display: none; }
+  .table-responsive tbody tr {
+    display: block;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+  .table-responsive tbody td {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border: none;
+  }
+  .table-responsive tbody td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: #64748b;
+  }
+}
