@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth, useToast, formatCurrency } from '../lib/auth';
 import { db, type Product, type Customer, type Sale, type SaleItem } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,7 +7,8 @@ import Input from '../components/ui/Input';
 import { 
   Plus, Search, Trash2, Printer, ShoppingCart, X, 
   UserPlus, ScanBarcode, Eye, Minus, CreditCard, 
-  Banknote, CheckSquare, Square, Barcode, Users, Package, Edit
+  Banknote, CheckSquare, Square, Barcode, Users, Package, Edit,
+  DollarSign, FileText, History
 } from 'lucide-react';
 import InvoicePrint from '../components/InvoicePrint';
 
@@ -1016,14 +1017,31 @@ function EditSaleModal({ sale, onClose, onSave }: {
   const [paymentMethod, setPaymentMethod] = useState(sale.paymentMethod);
   const [notes, setNotes] = useState(sale.notes);
   const [status, setStatus] = useState(sale.status);
+  const [settled, setSettled] = useState(sale.remaining === 0);
 
   const settings = db.getSettings();
 
+  // محاسبه مبلغ نهایی
+  const subtotal = sale.subtotal;
+  const discountAmount = discountType === 'percent' 
+    ? Math.round(subtotal * discount / 100) 
+    : discount;
+  const tax = Math.round((subtotal - discountAmount) * settings.taxRate / 100);
+  const total = subtotal - discountAmount + tax;
+
+  // تسویه خودکار
+  useEffect(() => {
+    if (settled) {
+      setPaid(total);
+    }
+  }, [settled, total]);
+
   const handleSave = () => {
+    const finalPaid = settled ? total : paid;
     onSave({
       discount,
       discountType,
-      paid,
+      paid: finalPaid,
       paymentMethod,
       notes,
       status,
@@ -1098,8 +1116,9 @@ function EditSaleModal({ sale, onClose, onSave }: {
               <input
                 type="number"
                 value={paid}
-                onChange={e => setPaid(Number(e.target.value))}
-                className="input"
+                onChange={e => { setPaid(Number(e.target.value)); setSettled(false); }}
+                disabled={settled}
+                className="input disabled:bg-slate-100 dark:disabled:bg-slate-700"
               />
             </div>
             <div>
@@ -1116,6 +1135,39 @@ function EditSaleModal({ sale, onClose, onSave }: {
               </select>
             </div>
           </div>
+
+          {/* تیک تسویه کامل */}
+          <label className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-2 border-green-200 dark:border-green-800 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={settled}
+              onChange={e => setSettled(e.target.checked)}
+              className="w-5 h-5 rounded text-green-600 focus:ring-2 focus:ring-green-500"
+            />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-green-700 dark:text-green-400">تسویه کامل</p>
+              <p className="text-xs text-green-600 dark:text-green-500">
+                با فعال کردن این گزینه، مبلغ پرداختی برابر مبلغ نهایی می‌شود
+              </p>
+            </div>
+            {settled && (
+              <div className="text-green-600 dark:text-green-400">
+                <CheckSquare size={24} />
+              </div>
+            )}
+          </label>
+
+          {/* نمایش مانده */}
+          {total - paid > 0 && !settled && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border-2 border-red-200 dark:border-red-800">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-red-700 dark:text-red-400">مانده بدهی:</span>
+                <span className="text-lg font-bold text-red-600 dark:text-red-400">
+                  {formatCurrency(total - paid, settings.currency)}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">وضعیت</label>
@@ -1145,22 +1197,34 @@ function EditSaleModal({ sale, onClose, onSave }: {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>جمع کل:</span>
-                <span className="font-bold">{formatCurrency(sale.subtotal, settings.currency)}</span>
+                <span className="font-bold">{formatCurrency(subtotal, settings.currency)}</span>
               </div>
-              <div className="flex justify-between text-red-600">
-                <span>تخفیف:</span>
-                <span>- {formatCurrency(discountType === 'percent' ? Math.round(sale.subtotal * discount / 100) : discount, settings.currency)}</span>
-              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>تخفیف:</span>
+                  <span>- {formatCurrency(discountAmount, settings.currency)}</span>
+                </div>
+              )}
+              {tax > 0 && (
+                <div className="flex justify-between">
+                  <span>مالیات:</span>
+                  <span>{formatCurrency(tax, settings.currency)}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-lg border-t border-blue-300 dark:border-blue-700 pt-2">
                 <span>مبلغ نهایی:</span>
-                <span className="text-blue-600">
-                  {formatCurrency(
-                    sale.subtotal - (discountType === 'percent' ? Math.round(sale.subtotal * discount / 100) : discount) + 
-                    Math.round((sale.subtotal - (discountType === 'percent' ? Math.round(sale.subtotal * discount / 100) : discount)) * settings.taxRate / 100),
-                    settings.currency
-                  )}
-                </span>
+                <span className="text-blue-600">{formatCurrency(total, settings.currency)}</span>
               </div>
+              <div className="flex justify-between pt-2 border-t border-blue-300 dark:border-blue-700">
+                <span>پرداخت شده:</span>
+                <span className="font-bold text-green-600">{formatCurrency(settled ? total : paid, settings.currency)}</span>
+              </div>
+              {total - (settled ? total : paid) > 0 && (
+                <div className="flex justify-between text-red-600 font-bold">
+                  <span>مانده:</span>
+                  <span>{formatCurrency(total - (settled ? total : paid), settings.currency)}</span>
+                </div>
+              )}
             </div>
           </div>
 
