@@ -451,22 +451,6 @@ export default function Repairs() {
                           <span className="text-xs text-slate-400 italic">فقط مدیر</span>
                         )
                       )}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => { setPrintRepairId(r.id); setPrintType('receipt'); }}
-                      >
-                        <Printer size={14} />
-                        رسید
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => { setPrintRepairId(r.id); setPrintType('invoice'); }}
-                      >
-                        <Printer size={14} />
-                        فاکتور
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -532,6 +516,14 @@ export default function Repairs() {
           initialSettled={settled}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditRepair(null); setSettled(false); }}
+          onPrintReceipt={editRepair ? () => {
+            setPrintRepairId(editRepair.id);
+            setPrintType('receipt');
+          } : undefined}
+          onPrintInvoice={editRepair ? () => {
+            setPrintRepairId(editRepair.id);
+            setPrintType('invoice');
+          } : undefined}
         />
       )}
 

@@ -1,33 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../lib/auth';
+import { useAuth, formatCurrency, toJalali } from '../lib/auth';
 import { db } from '../lib/db';
-import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
 import { 
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, 
   Users, Package, Wrench, AlertTriangle, ArrowUpRight, ArrowDownRight,
-  Plus, Search, Filter
+  Calendar, Clock
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { user, hasPermission } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState<any>({});
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
+  const [pendingRepairs, setPendingRepairs] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
   const loadDashboardData = () => {
-    // Calculate stats from real data
     const sales = db.getSales().filter(s => s.status === 'completed');
     const today = new Date().toDateString();
     const todaySales = sales.filter(s => new Date(s.date).toDateString() === today);
     
     const todayRevenue = todaySales.reduce((sum, s) => sum + s.total, 0);
-    const todayProfit = todaySales.reduce((sum, s) => {
-      return sum + s.items.reduce((itemSum, item) => {
+    const todayProfit = todaySales.reduce((sum, sale) => {
+      return sum + sale.items.reduce((itemSum, item) => {
         return itemSum + ((item.sellPrice - item.buyPrice) * item.quantity);
       }, 0);
     }, 0);
@@ -36,10 +34,10 @@ export default function Dashboard() {
     const activeCustomers = customers.filter(c => c.invoiceCount > 0).length;
 
     const repairs = db.getRepairs();
-    const openRepairs = repairs.filter(r => !['delivered', 'cancelled'].includes(r.status)).length;
+    const openRepairs = repairs.filter(r => !['delivered', 'cancelled', 'not_repairable'].includes(r.status)).length;
 
     const products = db.getProducts();
-    const lowStockProducts = products.filter(p => p.stock <= p.minStock && p.minStock > 0);
+    const lowStock = products.filter(p => p.stock <= p.minStock && p.minStock > 0);
 
     const customerDebts = customers.reduce((sum, c) => sum + c.debt, 0);
 
@@ -48,228 +46,171 @@ export default function Dashboard() {
       todayProfit,
       activeCustomers,
       openRepairs,
-      lowStockCount: lowStockProducts.length,
+      lowStockCount: lowStock.length,
       customerDebts,
+      totalSales: sales.length,
     });
 
-    // Generate alerts
-    const newAlerts: any[] = [];
-    
-    if (openRepairs > 0) {
-      newAlerts.push({
-        type: 'warning',
-        icon: Wrench,
-        message: `${openRepairs} تعمیر در انتظار`,
-        page: 'repairs',
-      });
-    }
-
-    if (lowStockProducts.length > 0) {
-      newAlerts.push({
-        type: 'error',
-        icon: AlertTriangle,
-        message: `${lowStockProducts.length} کالا زیر حداقل موجودی`,
-        page: 'inventory',
-      });
-    }
-
-    if (customerDebts > 0) {
-      newAlerts.push({
-        type: 'info',
-        icon: DollarSign,
-        message: `مطالبات: ${customerDebts.toLocaleString()} تومان`,
-        page: 'customeraccounts',
-      });
-    }
-
-    setAlerts(newAlerts);
-
-    // Recent activities
-    const activities: any[] = [];
-
-    // Recent sales
-    sales.slice(-3).reverse().forEach(sale => {
-      activities.push({
-        type: 'sale',
-        title: 'فروش جدید',
-        description: sale.customerName,
-        amount: sale.total,
-        time: new Date(sale.date).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-        icon: ShoppingCart,
-        color: 'bg-blue-500',
-      });
-    });
-
-    // Recent repairs
-    repairs.slice(-2).reverse().forEach(repair => {
-      activities.push({
-        type: 'repair',
-        title: 'تعمیر',
-        description: `${repair.customerName} - ${repair.device}`,
-        time: new Date(repair.entryDate).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-        icon: Wrench,
-        color: 'bg-purple-500',
-      });
-    });
-
-    setRecentActivities(activities.slice(0, 5));
+    setRecentSales(sales.slice(-5).reverse());
+    setLowStockProducts(lowStock.slice(0, 5));
+    setPendingRepairs(repairs.filter(r => r.status === 'ready_for_delivery').slice(0, 5));
   };
 
-  const formatCurrency = (amount: number) => {
-    return amount.toLocaleString('fa-IR') + ' تومان';
-  };
+  const statCards = [
+    {
+      title: 'فروش امروز',
+      value: formatCurrency(stats.todayRevenue || 0),
+      icon: ShoppingCart,
+      color: 'bg-blue-500',
+      trend: '+12%',
+      trendUp: true,
+    },
+    {
+      title: 'سود امروز',
+      value: formatCurrency(stats.todayProfit || 0),
+      icon: TrendingUp,
+      color: 'bg-green-500',
+      trend: '+8%',
+      trendUp: true,
+    },
+    {
+      title: 'مشتریان فعال',
+      value: stats.activeCustomers || 0,
+      icon: Users,
+      color: 'bg-purple-500',
+      trend: '+5',
+      trendUp: true,
+    },
+    {
+      title: 'تعمیرات باز',
+      value: stats.openRepairs || 0,
+      icon: Wrench,
+      color: 'bg-amber-500',
+      trend: '-3',
+      trendUp: false,
+    },
+  ];
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Welcome Section */}
-      <div className="card p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">
-              خوش آمدید، {user?.fullName} 👋
-            </h1>
-            <p className="text-white/90">
-              خلاصه وضعیت امروز فروشگاه
-            </p>
+      {/* Welcome */}
+      <div className="bg-gradient-to-l from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
+        <h1 className="text-2xl font-bold mb-2">
+          خوش آمدید، {user?.fullName} 👋
+        </h1>
+        <p className="text-blue-100">
+          خلاصه وضعیت امروز فروشگاه
+        </p>
+        <div className="flex items-center gap-4 mt-4 text-sm">
+          <div className="flex items-center gap-2">
+            <Calendar size={16} />
+            <span>{toJalali(new Date())}</span>
           </div>
-          <div className="hidden md:block">
-            <div className="text-4xl font-bold">
-              {new Date().toLocaleDateString('fa-IR', { weekday: 'long' })}
-            </div>
+          <div className="flex items-center gap-2">
+            <Clock size={16} />
+            <span>{new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
-              <ShoppingCart size={24} className="text-white" />
+        {statCards.map((stat, index) => (
+          <div key={index} className="card p-5">
+            <div className="flex items-start justify-between mb-3">
+              <div className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center`}>
+                <stat.icon size={24} className="text-white" />
+              </div>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                stat.trendUp 
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              }`}>
+                {stat.trendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                {stat.trend}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{stat.title}</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</h3>
             </div>
           </div>
-          <div>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">فروش امروز</p>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              {formatCurrency(stats.todayRevenue || 0)}
-            </h3>
-          </div>
-        </div>
-
-        <div className="card p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
-              <TrendingUp size={24} className="text-white" />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">سود امروز</p>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              {formatCurrency(stats.todayProfit || 0)}
-            </h3>
-          </div>
-        </div>
-
-        <div className="card p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
-              <Users size={24} className="text-white" />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">مشتریان فعال</p>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              {stats.activeCustomers || 0} نفر
-            </h3>
-          </div>
-        </div>
-
-        <div className="card p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center">
-              <Wrench size={24} className="text-white" />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">تعمیرات باز</p>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              {stats.openRepairs || 0} دستگاه
-            </h3>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Alerts Section */}
-      {alerts.length > 0 && (
+      {/* Alerts */}
+      {(stats.lowStockCount > 0 || stats.customerDebts > 0 || pendingRepairs.length > 0) && (
         <div className="card p-6">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
             <AlertTriangle size={20} className="text-amber-500" />
             نیازمند توجه
           </h2>
           <div className="space-y-3">
-            {alerts.map((alert, index) => (
-              <div
-                key={index}
-                className={`flex items-center gap-3 p-3 rounded-lg ${
-                  alert.type === 'error'
-                    ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                    : alert.type === 'warning'
-                    ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
-                    : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                }`}
-              >
-                <alert.icon size={20} className={
-                  alert.type === 'error'
-                    ? 'text-red-600 dark:text-red-400'
-                    : alert.type === 'warning'
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-blue-600 dark:text-blue-400'
-                } />
-                <span className="flex-1 text-sm font-medium">
-                  {alert.message}
+            {stats.lowStockCount > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <Package size={20} className="text-amber-600 dark:text-amber-400" />
+                <span className="flex-1 text-sm font-medium text-amber-900 dark:text-amber-300">
+                  {stats.lowStockCount} کالا موجودی کم دارند
                 </span>
               </div>
-            ))}
+            )}
+            {stats.customerDebts > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                <DollarSign size={20} className="text-red-600 dark:text-red-400" />
+                <span className="flex-1 text-sm font-medium text-red-900 dark:text-red-300">
+                  مطالبات: {formatCurrency(stats.customerDebts)}
+                </span>
+              </div>
+            )}
+            {pendingRepairs.length > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <Wrench size={20} className="text-green-600 dark:text-green-400" />
+                <span className="flex-1 text-sm font-medium text-green-900 dark:text-green-300">
+                  {pendingRepairs.length} تعمیر آماده تحویل
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activities */}
-        <div className="lg:col-span-2 card p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Sales */}
+        <div className="card p-6">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
-            فعالیت‌های اخیر
+            فروش‌های اخیر
           </h2>
-          {recentActivities.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
-              هنوز فعالیتی ثبت نشده است
+          {recentSales.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <ShoppingCart size={48} className="mx-auto mb-2 opacity-30" />
+              <p>هنوز فروشی ثبت نشده است</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {recentActivities.map((activity, index) => (
-                <div
+              {recentSales.map((sale, index) => (
+                <div 
                   key={index}
-                  className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg"
+                  className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                 >
-                  <div className={`w-10 h-10 ${activity.color} rounded-lg flex items-center justify-center`}>
-                    <activity.icon size={20} className="text-white" />
+                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <ShoppingCart size={20} className="text-white" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 dark:text-white">
-                      {activity.title}
+                    <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
+                      فاکتور #{sale.invoiceNumber}
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {activity.description}
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {sale.customerName}
                     </p>
                   </div>
                   <div className="text-left">
-                    {activity.amount && (
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">
-                        {formatCurrency(activity.amount)}
-                      </p>
-                    )}
-                    <p className="text-xs text-slate-500">{activity.time}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
+                      {formatCurrency(sale.total)}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {toJalali(sale.date)}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -277,27 +218,81 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Quick Stats */}
+        {/* Low Stock Products */}
         <div className="card p-6">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
-            آمار سریع
+            موجودی کم
           </h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-              <span className="text-sm text-slate-600 dark:text-slate-400">موجودی کم</span>
-              <span className="text-lg font-bold text-amber-600">
-                {stats.lowStockCount || 0}
-              </span>
+          {lowStockProducts.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <Package size={48} className="mx-auto mb-2 opacity-30" />
+              <p>همه کالاها موجودی کافی دارند</p>
             </div>
-            <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-              <span className="text-sm text-slate-600 dark:text-slate-400">مطالبات</span>
-              <span className="text-lg font-bold text-blue-600">
-                {formatCurrency(stats.customerDebts || 0)}
-              </span>
+          ) : (
+            <div className="space-y-3">
+              {lowStockProducts.map((product, index) => (
+                <div 
+                  key={index}
+                  className="flex items-center gap-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800"
+                >
+                  <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                    <AlertTriangle size={20} className="text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
+                      {product.name}
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {product.brand} {product.model}
+                    </p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                      موجودی: {product.stock}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      حداقل: {product.minStock}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Pending Repairs */}
+      {pendingRepairs.length > 0 && (
+        <div className="card p-6">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+            تعمیرات آماده تحویل
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pendingRepairs.map((repair, index) => (
+              <div 
+                key={index}
+                className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Wrench size={16} className="text-green-600 dark:text-green-400" />
+                  <span className="text-xs font-semibold text-green-700 dark:text-green-400">
+                    #{repair.ticketNumber}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-slate-900 dark:text-white text-sm mb-1">
+                  {repair.customerName}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  {repair.brand} {repair.model}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  {toJalali(repair.entryDate)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

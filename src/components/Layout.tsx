@@ -61,7 +61,6 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['financial']);
 
-  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -171,17 +170,17 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
           {/* Logo */}
           <div className={`p-4 border-b border-slate-200 dark:border-slate-700 ${minimized ? 'px-2' : ''}`}>
             <div className={`flex items-center ${minimized ? 'justify-center' : 'gap-3'}`}>
-              <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center text-white font-bold text-xl">
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
                 ID
               </div>
               {!minimized && (
-                <div>
-                  <h1 className="font-bold text-lg text-slate-900 dark:text-white">ID Mobile</h1>
+                <div className="flex-1">
+                  <h1 className="font-bold text-base text-slate-900 dark:text-white">ID Mobile</h1>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Manager Pro</p>
                 </div>
               )}
               {!minimized && (
-                <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 ml-auto">
+                <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1">
                   <X size={20} />
                 </button>
               )}
@@ -229,7 +228,7 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -237,16 +236,16 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
       {/* Main Content */}
       <div className={`flex-1 ${minimized ? 'lg:mr-16' : 'lg:mr-72'} transition-all duration-300`}>
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700">
+        <header className="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-300"
+                className="lg:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
               >
                 <Menu size={24} />
               </button>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                 {menuItems.find(m => m.id === currentPage)?.label || 
                  menuItems.find(m => m.children?.some(c => c.id === currentPage))?.children?.find(c => c.id === currentPage)?.label || 
                  'داشبورد'}
@@ -254,32 +253,28 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Global Search */}
               <button 
                 onClick={() => setSearchOpen(true)}
-                className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-2 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-2 hover:bg-slate-200 dark:hover:bg-slate-600"
               >
                 <Search size={18} className="text-slate-400" />
                 <span className="text-sm text-slate-500">جستجو...</span>
                 <kbd className="text-xs bg-white dark:bg-slate-800 px-2 py-0.5 rounded">Ctrl+K</kbd>
               </button>
 
-              {/* Quick Actions */}
               <button 
                 onClick={() => setQuickActionsOpen(true)}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg relative"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
                 title="دسترسی سریع (Ctrl+N)"
               >
                 <Plus size={20} />
               </button>
 
-              {/* Notifications */}
               <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg relative">
                 <Bell size={20} />
-                <span className="absolute top-1 left-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                <span className="absolute top-1 left-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
 
-              {/* Theme Toggle */}
               <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
                 <Moon size={20} className="dark:hidden" />
                 <Sun size={20} className="hidden dark:block" />
@@ -288,20 +283,17 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
           </div>
         </header>
 
-        {/* Page Content */}
         <main className="p-6">
           {children}
         </main>
       </div>
 
-      {/* Global Search Modal */}
       <GlobalSearch
         isOpen={searchOpen}
         onClose={() => setSearchOpen(false)}
         onNavigate={onNavigate}
       />
 
-      {/* Quick Actions Modal */}
       <QuickActions
         isOpen={quickActionsOpen}
         onClose={() => setQuickActionsOpen(false)}

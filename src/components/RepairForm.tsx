@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, useToast, formatCurrency } from '../lib/auth';
 import { db, type Repair, type RepairPart } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { X, Save } from 'lucide-react';
+import { X, Save, Printer } from 'lucide-react';
 
 interface RepairFormProps {
   repair?: Repair | null;
   initialSettled?: boolean;
   onSave: (repair: Repair) => void;
   onCancel: () => void;
+  onPrintReceipt?: () => void;
+  onPrintInvoice?: () => void;
 }
 
-export default function RepairForm({ repair, initialSettled = false, onSave, onCancel }: RepairFormProps) {
+export default function RepairForm({ repair, initialSettled = false, onSave, onCancel, onPrintReceipt, onPrintInvoice }: RepairFormProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [settled, setSettled] = useState(initialSettled);
@@ -726,21 +728,41 @@ export default function RepairForm({ repair, initialSettled = false, onSave, onC
         </div>
         
         {/* Footer */}
-        <div className="border-t p-4 flex items-center justify-between bg-gray-50">
+        <div className="border-t p-4 flex items-center justify-between bg-gray-50 dark:bg-slate-800">
           <button
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+            className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"
           >
             انصراف
           </button>
           
-          <button
-            onClick={handleSubmit}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg flex items-center gap-2 hover:bg-green-700"
-          >
-            <Save size={20} />
-            {repair ? 'ذخیره تغییرات' : 'ثبت پذیرش'}
-          </button>
+          <div className="flex items-center gap-2">
+            {repair && onPrintReceipt && (
+              <button
+                onClick={onPrintReceipt}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg flex items-center gap-2 hover:bg-purple-700"
+              >
+                <Printer size={16} />
+                چاپ رسید
+              </button>
+            )}
+            {repair && onPrintInvoice && (
+              <button
+                onClick={onPrintInvoice}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg flex items-center gap-2 hover:bg-green-700"
+              >
+                <Printer size={16} />
+                چاپ فاکتور
+              </button>
+            )}
+            <button
+              onClick={handleSubmit}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700"
+            >
+              <Save size={20} />
+              {repair ? 'ذخیره تغییرات' : 'ثبت پذیرش'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,89 +1,32 @@
-/* ============================================
-   ID Mobile Manager Pro - Design System
-   Professional, Clean, Calm, Fast
-   ============================================ */
-
 @import "tailwindcss";
 
-/* ============================================
-   Design Tokens
-   ============================================ */
-
 @theme {
-  /* Typography */
   --font-vazir: 'Vazirmatn', Tahoma, Arial, sans-serif;
-  
-  /* Colors - Professional Palette */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
-  
-  /* Neutral Colors */
-  --color-neutral-50: #f8fafc;
-  --color-neutral-100: #f1f5f9;
-  --color-neutral-200: #e2e8f0;
-  --color-neutral-300: #cbd5e1;
-  --color-neutral-400: #94a3b8;
-  --color-neutral-500: #64748b;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #334155;
-  --color-neutral-800: #1e293b;
-  --color-neutral-900: #0f172a;
-  
-  /* Semantic Colors */
-  --color-success-500: #10b981;
-  --color-success-600: #059669;
-  --color-warning-500: #f59e0b;
-  --color-warning-600: #d97706;
-  --color-error-500: #ef4444;
-  --color-error-600: #dc2626;
-  --color-info-500: #06b6d4;
-  --color-info-600: #0891b2;
 }
-
-/* ============================================
-   Base Styles
-   ============================================ */
 
 * {
   font-family: 'Vazirmatn', Tahoma, Arial, sans-serif;
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
 body {
   direction: rtl;
-  background: #f8fafc;
+  background-color: #f8fafc;
   color: #0f172a;
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  font-size: 15px;
-  line-height: 1.6;
 }
 
 .dark body {
-  background: #0f172a;
+  background-color: #0f172a;
   color: #f1f5f9;
 }
 
-/* ============================================
-   Scrollbar - Professional
-   ============================================ */
-
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -95,30 +38,16 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 8px;
-  border: 2px solid #f1f5f9;
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 .dark ::-webkit-scrollbar-thumb {
   background: #475569;
-  border: 2px solid #1e293b;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
-/* ============================================
-   Animations - Subtle & Professional
-   ============================================ */
-
+/* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideInUp {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -129,60 +58,36 @@ body {
   }
 }
 
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 .animate-fadeIn {
-  animation: fadeIn 0.2s ease-out;
+  animation: fadeIn 0.3s ease-out;
 }
 
-.animate-slideInUp {
-  animation: slideInUp 0.3s ease-out;
+/* Card */
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
 }
 
-.animate-scaleIn {
-  animation: scaleIn 0.2s ease-out;
+.dark .card {
+  background: #1e293b;
+  border-color: #334155;
 }
 
-/* Reduced Motion Support */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* ============================================
-   Button System
-   ============================================ */
-
+/* Button */
 .btn {
-  padding: 10px 20px;
+  padding: 8px 16px;
   border-radius: 8px;
   font-weight: 600;
   font-size: 14px;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
   cursor: pointer;
   border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -190,35 +95,26 @@ body {
   color: white;
 }
 
-.btn-primary:hover:not(:disabled) {
+.btn-primary:hover {
   background: #1d4ed8;
 }
 
-.btn-secondary {
-  background: #64748b;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #475569;
-}
-
 .btn-success {
-  background: #059669;
+  background: #10b981;
   color: white;
 }
 
-.btn-success:hover:not(:disabled) {
-  background: #047857;
+.btn-success:hover {
+  background: #059669;
 }
 
 .btn-danger {
-  background: #dc2626;
+  background: #ef4444;
   color: white;
 }
 
-.btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
+.btn-danger:hover {
+  background: #dc2626;
 }
 
 .btn-outline {
@@ -227,7 +123,7 @@ body {
   color: #2563eb;
 }
 
-.btn-outline:hover:not(:disabled) {
+.btn-outline:hover {
   background: #2563eb;
   color: white;
 }
@@ -237,107 +133,43 @@ body {
   color: #64748b;
 }
 
-.btn-ghost:hover:not(:disabled) {
+.btn-ghost:hover {
   background: #f1f5f9;
 }
 
-.dark .btn-ghost:hover:not(:disabled) {
-  background: #1e293b;
+.dark .btn-ghost:hover {
+  background: #334155;
 }
 
-/* Button Sizes */
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 13px;
-  min-height: 32px;
-}
-
-.btn-lg {
-  padding: 14px 28px;
-  font-size: 16px;
-  min-height: 48px;
-}
-
-/* ============================================
-   Input System
-   ============================================ */
-
+/* Input */
 .input {
   width: 100%;
   padding: 10px 14px;
   background: white;
   border: 2px solid #e2e8f0;
   border-radius: 8px;
-  font-size: 15px;
-  transition: all 0.2s ease;
+  font-size: 14px;
+  transition: all 0.2s;
   outline: none;
-  color: #0f172a;
-  min-height: 44px;
 }
 
 .dark .input {
-  background: #1e293b;
-  border: 2px solid #334155;
+  background: #0f172a;
+  border-color: #334155;
   color: #f1f5f9;
 }
 
 .input:focus {
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.dark .input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.input::placeholder {
-  color: #94a3b8;
-}
-
-.input-error {
-  border-color: #dc2626;
-}
-
-.input-error:focus {
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
-}
-
-/* ============================================
-   Card System
-   ============================================ */
-
-.card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
-  transition: all 0.2s ease;
-}
-
-.dark .card {
-  background: #1e293b;
-  border: 1px solid #334155;
-}
-
-.card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.dark .card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* ============================================
-   Badge System
-   ============================================ */
-
+/* Badge */
 .badge {
   display: inline-flex;
   align-items: center;
   padding: 4px 12px;
   border-radius: 16px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -381,15 +213,12 @@ body {
   color: #bfdbfe;
 }
 
-/* ============================================
-   Table System
-   ============================================ */
-
+/* Table */
 .table {
   width: 100%;
   border-collapse: collapse;
   background: white;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -404,25 +233,24 @@ body {
 
 .dark .table thead {
   background: #0f172a;
-  border-bottom: 2px solid #334155;
+  border-bottom-color: #334155;
 }
 
 .table th {
-  padding: 14px 16px;
+  padding: 12px 16px;
   text-align: right;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  color: #475569;
+  color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .dark .table th {
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 .table td {
-  padding: 14px 16px;
+  padding: 12px 16px;
   font-size: 14px;
   color: #334155;
   border-bottom: 1px solid #f1f5f9;
@@ -430,11 +258,7 @@ body {
 
 .dark .table td {
   color: #e2e8f0;
-  border-bottom: 1px solid #334155;
-}
-
-.table tbody tr {
-  transition: background 0.2s ease;
+  border-bottom-color: #334155;
 }
 
 .table tbody tr:hover {
@@ -445,79 +269,7 @@ body {
   background: #0f172a;
 }
 
-/* ============================================
-   Modal System
-   ============================================ */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  max-width: 600px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.dark .modal {
-  background: #1e293b;
-}
-
-/* ============================================
-   Toast System
-   ============================================ */
-
-.toast {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 100;
-  padding: 14px 20px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 300px;
-  animation: slideInUp 0.3s ease-out;
-}
-
-.toast-success {
-  background: #059669;
-  color: white;
-}
-
-.toast-error {
-  background: #dc2626;
-  color: white;
-}
-
-.toast-warning {
-  background: #d97706;
-  color: white;
-}
-
-.toast-info {
-  background: #0891b2;
-  color: white;
-}
-
-/* ============================================
-   Print Styles
-   ============================================ */
-
+/* Print */
 @media print {
   .no-print {
     display: none !important;
@@ -532,45 +284,31 @@ body {
   }
 }
 
-/* ============================================
-   Responsive Utilities
-   ============================================ */
-
-@media (max-width: 768px) {
-  .btn {
-    padding: 8px 16px;
-    font-size: 13px;
-  }
-  
-  .input {
-    padding: 8px 12px;
-    font-size: 14px;
-  }
+/* Invoice sizes */
+.invoice-80mm {
+  width: 80mm;
+  padding: 3mm;
+  font-size: 11px;
 }
 
-/* ============================================
-   Focus Visible
-   ============================================ */
+.invoice-a5 {
+  width: 148mm;
+  padding: 10mm;
+}
 
+.invoice-a4 {
+  width: 210mm;
+  padding: 15mm;
+}
+
+/* Focus */
 *:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
 
-.dark *:focus-visible {
-  outline: 2px solid #3b82f6;
-}
-
-/* ============================================
-   Selection
-   ============================================ */
-
+/* Selection */
 ::selection {
   background: #2563eb;
   color: white;
-}
-
-.dark ::selection {
-  background: #3b82f6;
-  color: #0f172a;
 }
