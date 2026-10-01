@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, useToast, formatCurrency, toJalali } from '../lib/auth';
 import { db, type Repair } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Search, Edit, X, Wrench, Printer, Eye } from 'lucide-react';
+import Button from '../components/ui/Button';
+import { 
+  Plus, Search, Edit, Printer, Wrench, X, Filter,
+  CheckCircle, Clock, AlertCircle, XCircle, Eye
+} from 'lucide-react';
 import RepairForm from '../components/RepairForm';
 import RepairPrint from '../components/RepairPrint';
 
@@ -34,6 +38,20 @@ const statusColors: Record<string, string> = {
   not_repairable: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300',
 };
 
+const statusIcons: Record<string, any> = {
+  received: Clock,
+  waiting_check: Clock,
+  diagnosing: AlertCircle,
+  waiting_customer_approval: Clock,
+  repairing: Wrench,
+  waiting_part: AlertCircle,
+  completed: CheckCircle,
+  ready_for_delivery: CheckCircle,
+  delivered: CheckCircle,
+  cancelled: XCircle,
+  not_repairable: XCircle,
+};
+
 export default function Repairs() {
   const { user, hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -46,12 +64,15 @@ export default function Repairs() {
   const [printRepairId, setPrintRepairId] = useState<string | null>(null);
   const [printType, setPrintType] = useState<'receipt' | 'invoice'>('receipt');
   const [settled, setSettled] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   useEffect(() => { loadRepairs(); }, []);
   const loadRepairs = () => setRepairs(db.getRepairs().reverse());
 
   const filtered = repairs.filter(r => {
-    const matchSearch = r.ticketNumber.includes(search) || r.customerName.includes(search) || r.device?.includes(search) || r.imei?.includes(search);
+    const matchSearch = r.ticketNumber.includes(search) || r.customerName.includes(search) || 
+                       r.device?.includes(search) || r.imei?.includes(search) ||
+                       r.brand?.includes(search) || r.model?.includes(search);
     const matchStatus = statusFilter === 'all' || r.status === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -64,25 +85,11 @@ export default function Repairs() {
 
   const openEdit = (r: Repair) => {
     setEditRepair(r);
+    setSettled(r.remaining === 0 && r.status === 'delivered');
     setShowForm(true);
-    // اگر تعمیر تسویه شده است، settled را true کن
-    if (r.remaining === 0 && r.status === 'delivered') {
-      setSettled(true);
-    } else {
-      setSettled(false);
-    }
   };
 
-  // ریست settled وقتی فرم باز می‌شود
-  useEffect(() => {
-    if (showForm && editRepair) {
-      // اگر تعمیر تسویه شده است، settled را true کن
-      // این در RepairForm مدیریت می‌شود
-    }
-  }, [showForm, editRepair]);
-
   const handleSave = (repairData: Repair) => {
-    // محاسبه هزینه نهایی
     const finalTotal = (repairData.totalCost || 0) - (repairData.discount || 0);
     const remaining = finalTotal - (repairData.paid || 0);
     
@@ -94,31 +101,24 @@ export default function Repairs() {
     };
 
     if (editRepair) {
-      // Update existing repair
       db.saveRepair(finalRepairData);
       showToast('success', 'تعمیر ویرایش شد');
     } else {
-      // Create new repair
       db.saveRepair(finalRepairData);
       showToast('success', 'تعمیر ثبت شد');
     }
 
     // اضافه کردن مشتری به لیست مشتریان
-    console.log('👤 بررسی مشتری:', finalRepairData.customerName, finalRepairData.customerMobile);
     if (finalRepairData.customerName && finalRepairData.customerMobile) {
       const customerNames = finalRepairData.customerName.trim().split(' ');
       const firstName = customerNames[0] || '';
       const lastName = customerNames.slice(1).join(' ') || '';
       
-      // بررسی آیا مشتری با این موبایل قبلاً وجود دارد
       let customer = db.getCustomers().find(c => 
         c.mobile === finalRepairData.customerMobile && finalRepairData.customerMobile !== ''
       );
       
-      console.log('👤 مشتری موجود:', customer);
-      
       if (!customer) {
-        // ایجاد مشتری جدید
         customer = {
           id: uuidv4(),
           firstName: firstName,
@@ -133,29 +133,20 @@ export default function Repairs() {
           invoiceCount: 0,
           createdAt: new Date().toISOString(),
         };
-        console.log('👤 ایجاد مشتری جدید:', customer);
         db.saveCustomer(customer);
-        console.log('✅ مشتری ذخیره شد');
         showToast('success', `مشتری ${finalRepairData.customerName} به لیست مشتریان اضافه شد`);
-      } else {
-        console.log('ℹ️ مشتری قبلاً وجود دارد');
       }
-    } else {
-      console.warn('⚠️ نام یا موبایل مشتری خالی است');
     }
 
     // اگر تسویه کامل شده و وضعیت تحویل است، فاکتور فروش ایجاد شود
     if (finalRepairData.remaining === 0 && finalRepairData.status === 'delivered' && finalRepairData.finalTotal > 0) {
-      // پیدا کردن مشتری
       const customer = db.getCustomers().find(c => 
         c.mobile === finalRepairData.customerMobile && finalRepairData.customerMobile !== ''
       );
 
       if (customer) {
-        // ایجاد آیتم‌های فاکتور
         const saleItems: any[] = [];
         
-        // اضافه کردن قطعات
         if (finalRepairData.parts && finalRepairData.parts.length > 0) {
           finalRepairData.parts.forEach(part => {
             const product = part.productId ? db.getProduct(part.productId) : db.getProducts().find(p => p.name === part.productName);
@@ -177,7 +168,6 @@ export default function Repairs() {
           });
         }
 
-        // اضافه کردن اجرت به عنوان یک آیتم
         if (finalRepairData.labor > 0) {
           saleItems.push({
             id: uuidv4(),
@@ -196,7 +186,6 @@ export default function Repairs() {
           });
         }
 
-        // ایجاد فاکتور فروش
         const sale = {
           id: uuidv4(),
           invoiceNumber: db.getNextInvoiceNumber(),
@@ -222,7 +211,6 @@ export default function Repairs() {
 
         db.saveSale(sale);
         
-        // به‌روزرسانی اطلاعات مشتری
         customer.totalPurchase += finalRepairData.finalTotal;
         customer.totalPaid += finalRepairData.finalTotal;
         customer.invoiceCount += 1;
@@ -235,88 +223,270 @@ export default function Repairs() {
 
     setShowForm(false);
     setEditRepair(null);
+    setSettled(false);
     loadRepairs();
   };
 
+  // Stats
+  const totalRepairs = repairs.length;
+  const openRepairs = repairs.filter(r => !['delivered', 'cancelled', 'not_repairable'].includes(r.status)).length;
+  const readyForDelivery = repairs.filter(r => r.status === 'ready_for_delivery').length;
+  const totalRevenue = repairs.filter(r => r.status === 'delivered').reduce((sum, r) => sum + (r.finalTotal || r.totalCost || 0), 0);
+
+  // Kanban columns
+  const kanbanColumns = [
+    { status: 'received', label: 'دریافت شد' },
+    { status: 'diagnosing', label: 'در حال عیب‌یابی' },
+    { status: 'repairing', label: 'در حال تعمیر' },
+    { status: 'waiting_part', label: 'منتظر قطعه' },
+    { status: 'ready_for_delivery', label: 'آماده تحویل' },
+    { status: 'delivered', label: 'تحویل شد' },
+  ];
+
   return (
-    <div className="space-y-4 pb-20 lg:pb-0">
+    <div className="space-y-6 pb-20 lg:pb-0 animate-fadeIn">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">تعمیرات</h2>
-        {hasPermission('repairs.create') && (
-          <button onClick={openNew} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
-            <Plus size={16} /> پذیرش جدید
-          </button>
-        )}
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">تعمیرات</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">مدیریت پذیرش و تعمیرات دستگاه‌ها</p>
+        </div>
+        <div className="flex gap-2">
+          <div className="hidden md:flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              لیست
+            </button>
+            <button 
+              onClick={() => setViewMode('kanban')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'kanban' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              کانبان
+            </button>
+          </div>
+          {hasPermission('repairs.create') && (
+            <Button variant="primary" onClick={openNew}>
+              <Plus size={18} />
+              پذیرش جدید
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-2">
-        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="جستجو..." className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800">
-          <option value="all">همه</option>
-          {Object.entries(statusLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        {filtered.map(r => (
-          <div key={r.id} className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-sm">#{r.ticketNumber}</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusColors[r.status]}`}>{statusLabels[r.status]}</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">{r.customerName} | {r.customerMobile}</p>
-                <p className="text-xs text-slate-500">{r.brand} {r.model}</p>
-                <p className="text-xs text-slate-400">{toJalali(r.entryDate)} | تعمیرکار: {r.technicianName}</p>
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-bold">{formatCurrency(r.finalTotal || r.totalCost, settings.currency)}</p>
-                {(r.remaining || 0) > 0 && <p className="text-xs text-red-500">مانده: {formatCurrency(r.remaining, settings.currency)}</p>}
-                <div className="flex items-center gap-2 mt-2">
-                  {hasPermission('repairs.edit') && (
-                    <button 
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEdit(r);
-                      }} 
-                      className="px-3 py-1.5 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg flex items-center gap-1 transition-colors"
-                    >
-                      <Edit size={14} /> ویرایش
-                    </button>
-                  )}
-                  <button 
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPrintRepairId(r.id);
-                      setPrintType('receipt');
-                    }}
-                    className="px-3 py-1.5 text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <Printer size={14} /> رسید
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPrintRepairId(r.id);
-                      setPrintType('invoice');
-                    }}
-                    className="px-3 py-1.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded-lg flex items-center gap-1 transition-colors"
-                  >
-                    <Printer size={14} /> فاکتور
-                  </button>
-                </div>
-              </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+              <Wrench size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">کل تعمیرات</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">{totalRepairs}</p>
             </div>
           </div>
-        ))}
-        {filtered.length === 0 && <p className="text-center text-slate-500 py-8">تعمیری یافت نشد</p>}
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center">
+              <Clock size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">باز</p>
+              <p className="text-xl font-bold text-amber-600">{openRepairs}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+              <CheckCircle size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">آماده تحویل</p>
+              <p className="text-xl font-bold text-green-600">{readyForDelivery}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
+              <Wrench size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">درآمد تعمیرات</p>
+              <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalRevenue, settings.currency)}</p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Filters */}
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter size={20} className="text-slate-500" />
+          <h3 className="font-bold text-slate-900 dark:text-white">جستجو و فیلتر</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="relative">
+            <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              value={search} 
+              onChange={e => setSearch(e.target.value)}
+              placeholder="جستجو شماره، مشتری، دستگاه، IMEI..." 
+              className="input pr-12" 
+            />
+          </div>
+          <select 
+            value={statusFilter} 
+            onChange={e => setStatusFilter(e.target.value)}
+            className="input"
+          >
+            <option value="all">همه وضعیت‌ها</option>
+            {Object.entries(statusLabels).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <div className="space-y-3">
+          {filtered.map(r => {
+            const StatusIcon = statusIcons[r.status] || Clock;
+            return (
+              <div key={r.id} className="card p-5 hover:shadow-lg transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="font-bold text-lg text-slate-900 dark:text-white">
+                        #{r.ticketNumber}
+                      </p>
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${statusColors[r.status]}`}>
+                        <StatusIcon size={12} />
+                        {statusLabels[r.status]}
+                      </span>
+                      {(r.remaining || 0) === 0 && r.status === 'delivered' && (
+                        <span className="badge badge-success">تسویه ✓</span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+                      <p className="flex items-center gap-2">
+                        <span className="font-medium">مشتری:</span> {r.customerName} | {r.customerMobile}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <span className="font-medium">دستگاه:</span> {r.brand} {r.model} {r.device}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <span className="font-medium">تاریخ:</span> {toJalali(r.entryDate)} | تعمیرکار: {r.technicianName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xl font-bold text-slate-900 dark:text-white">
+                      {formatCurrency(r.finalTotal || r.totalCost || 0, settings.currency)}
+                    </p>
+                    {(r.remaining || 0) > 0 && (
+                      <p className="text-sm text-red-500 mt-1">
+                        مانده: {formatCurrency(r.remaining, settings.currency)}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-3">
+                      {hasPermission('repairs.edit') && (
+                        r.remaining > 0 || r.status !== 'delivered' || user?.role === 'admin' ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => openEdit(r)}
+                          >
+                            <Edit size={14} />
+                            ویرایش
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">فقط مدیر</span>
+                        )
+                      )}
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => { setPrintRepairId(r.id); setPrintType('receipt'); }}
+                      >
+                        <Printer size={14} />
+                        رسید
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => { setPrintRepairId(r.id); setPrintType('invoice'); }}
+                      >
+                        <Printer size={14} />
+                        فاکتور
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          
+          {filtered.length === 0 && (
+            <div className="card p-12 text-center">
+              <Wrench size={64} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+              <p className="text-lg font-medium text-slate-500 dark:text-slate-400">تعمیری یافت نشد</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                {search || statusFilter !== 'all' 
+                  ? 'فیلترهای خود را تغییر دهید' 
+                  : 'اولین پذیرش تعمیر را ثبت کنید'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Kanban View */}
+      {viewMode === 'kanban' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 overflow-x-auto">
+          {kanbanColumns.map(col => {
+            const columnRepairs = filtered.filter(r => r.status === col.status);
+            return (
+              <div key={col.status} className="bg-slate-100 dark:bg-slate-800 rounded-xl p-3 min-w-[250px]">
+                <div className="flex items-center justify-between mb-3 px-2">
+                  <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300">{col.label}</h3>
+                  <span className="badge badge-info text-xs">{columnRepairs.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {columnRepairs.map(r => (
+                    <div 
+                      key={r.id} 
+                      className="bg-white dark:bg-slate-700 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => openEdit(r)}
+                    >
+                      <p className="font-bold text-sm text-slate-900 dark:text-white mb-1">
+                        #{r.ticketNumber}
+                      </p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">{r.customerName}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                        {r.brand} {r.model}
+                      </p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white mt-2">
+                        {formatCurrency(r.finalTotal || r.totalCost || 0, settings.currency)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (

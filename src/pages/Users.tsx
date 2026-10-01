@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, useToast, toJalaliFull } from '../lib/auth';
 import { db, type User, getAllPermissions, getRolePermissions, getRolePages, getAllPages, hashPassword } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Edit, X, UserCog, Shield, Eye, EyeOff } from 'lucide-react';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import { 
+  Plus, Edit, X, UserCog, Shield, Eye, EyeOff, Users as UsersIcon,
+  CheckCircle, XCircle
+} from 'lucide-react';
 
 export default function UsersPage() {
   const { user: currentUser, hasPermission } = useAuth();
@@ -78,61 +83,128 @@ export default function UsersPage() {
   const sessions = db.getActiveSessions();
 
   return (
-    <div className="space-y-4 pb-20 lg:pb-0">
+    <div className="space-y-6 pb-20 lg:pb-0 animate-fadeIn">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">مدیریت کاربران</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">مدیریت کاربران</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">مدیریت کاربران و دسترسی‌ها</p>
+        </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowSessions(!showSessions)} className="px-3 py-2 bg-slate-200 dark:bg-slate-700 rounded-lg text-sm flex items-center gap-1">
-            <Eye size={14} /> Sessionها ({sessions.length})
-          </button>
-          <button onClick={openNew} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
-            <Plus size={16} /> کاربر جدید
-          </button>
+          <Button variant="outline" onClick={() => setShowSessions(!showSessions)}>
+            <Eye size={18} />
+            Sessionها ({sessions.length})
+          </Button>
+          <Button variant="primary" onClick={openNew}>
+            <Plus size={18} />
+            کاربر جدید
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+              <UsersIcon size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">کل کاربران</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">{users.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+              <CheckCircle size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">فعال</p>
+              <p className="text-xl font-bold text-green-600">{users.filter(u => u.active).length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
+              <XCircle size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">غیرفعال</p>
+              <p className="text-xl font-bold text-red-600">{users.filter(u => !u.active).length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+              <Shield size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Session فعال</p>
+              <p className="text-xl font-bold text-purple-600">{sessions.length}</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Active Sessions */}
       {showSessions && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <h3 className="font-bold text-sm mb-3">Sessionهای فعال</h3>
+        <div className="card p-6">
+          <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-4">Sessionهای فعال</h3>
           <div className="space-y-2">
             {sessions.map(s => (
-              <div key={s.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-700/50 rounded text-xs">
+              <div key={s.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
                 <div>
-                  <p className="font-medium">{s.username} ({s.role})</p>
-                  <p className="text-slate-500">ورود: {toJalaliFull(s.loginTime)}</p>
+                  <p className="font-medium text-slate-900 dark:text-white">{s.username} ({s.role})</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">ورود: {toJalaliFull(s.loginTime)}</p>
                 </div>
-                <button onClick={() => { db.endSession(s.id); showToast('success', 'Session خاتمه یافت'); }}
-                  className="px-2 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded text-xs">خروج اجباری</button>
+                <Button variant="danger" size="sm" onClick={() => { db.endSession(s.id); showToast('success', 'Session خاتمه یافت'); }}>
+                  خروج اجباری
+                </Button>
               </div>
             ))}
-            {sessions.length === 0 && <p className="text-sm text-slate-500 text-center py-2">Session فعالی وجود ندارد</p>}
+            {sessions.length === 0 && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">Session فعالی وجود ندارد</p>
+            )}
           </div>
         </div>
       )}
 
-      {/* Users list */}
-      <div className="space-y-2">
+      {/* Users List */}
+      <div className="space-y-3">
         {users.map(u => (
-          <div key={u.id} className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+          <div key={u.id} className="card p-5 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-sm">{u.fullName}</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${u.active ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'}`}>
+                <div className="flex items-center gap-3 mb-2">
+                  <p className="font-bold text-lg text-slate-900 dark:text-white">{u.fullName}</p>
+                  <span className={`badge ${u.active ? 'badge-success' : 'badge-error'}`}>
                     {u.active ? 'فعال' : 'غیرفعال'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">@{u.username} | {roleLabels[u.role]}</p>
-                {u.lastLogin && <p className="text-xs text-slate-400">آخرین ورود: {toJalaliFull(u.lastLogin)}</p>}
-                <p className="text-xs text-slate-400">{u.permissions.length} دسترسی | {u.visiblePages.length} صفحه</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  @{u.username} | {roleLabels[u.role]}
+                </p>
+                {u.lastLogin && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    آخرین ورود: {toJalaliFull(u.lastLogin)}
+                  </p>
+                )}
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  {u.permissions.length} دسترسی | {u.visiblePages.length} صفحه
+                </p>
               </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => openEdit(u)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"><Edit size={14} /></button>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
+                  <Edit size={16} className="text-blue-500" />
+                </Button>
                 {u.id !== currentUser?.id && (
-                  <button onClick={() => toggleActive(u)} className={`p-1.5 rounded ${u.active ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30' : 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/30'}`}>
-                    {u.active ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
+                  <Button variant="ghost" size="sm" onClick={() => toggleActive(u)}>
+                    {u.active ? <EyeOff size={16} className="text-red-500" /> : <Eye size={16} className="text-green-500" />}
+                  </Button>
                 )}
               </div>
             </div>
@@ -142,36 +214,44 @@ export default function UsersPage() {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-slate-800 p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-10">
-              <h3 className="font-bold">{editUser ? 'ویرایش کاربر' : 'کاربر جدید'}</h3>
-              <button onClick={() => setShowForm(false)} className="text-slate-500"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white dark:bg-slate-800 p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-10">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                {editUser ? 'ویرایش کاربر' : 'کاربر جدید'}
+              </h3>
+              <button onClick={() => setShowForm(false)} className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 p-2 rounded-lg">
+                <X size={24} />
+              </button>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="نام کاربری *"
+                  value={form.username}
+                  onChange={e => setForm({ ...form, username: e.target.value })}
+                />
+                <Input
+                  label={editUser ? 'رمز جدید (خالی = بدون تغییر)' : 'رمز عبور *'}
+                  type="password"
+                  value={form.password}
+                  onChange={e => setForm({ ...form, password: e.target.value })}
+                />
+                <Input
+                  label="نام کامل"
+                  value={form.fullName}
+                  onChange={e => setForm({ ...form, fullName: e.target.value })}
+                />
                 <div>
-                  <label className="text-xs text-slate-500">نام کاربری *</label>
-                  <input type="text" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500">{editUser ? 'رمز جدید (خالی = بدون تغییر)' : 'رمز عبور *'}</label>
-                  <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500">نام کامل</label>
-                  <input type="text" value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500">نقش</label>
-                  <select value={form.role} onChange={e => {
-                    const role = e.target.value as User['role'];
-                    setForm({ ...form, role, permissions: getRolePermissions(role), visiblePages: getRolePages(role) });
-                  }}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">نقش</label>
+                  <select 
+                    value={form.role} 
+                    onChange={e => {
+                      const role = e.target.value as User['role'];
+                      setForm({ ...form, role, permissions: getRolePermissions(role), visiblePages: getRolePages(role) });
+                    }}
+                    className="input"
+                  >
                     <option value="admin">مدیر کل</option>
                     <option value="manager">مدیر فروشگاه</option>
                     <option value="seller">فروشنده</option>
@@ -181,24 +261,32 @@ export default function UsersPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs text-slate-500">حداکثر تخفیف (%)</label>
-                <input type="number" value={form.maxDiscount} onChange={e => setForm({ ...form, maxDiscount: Number(e.target.value) })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-              </div>
+              <Input
+                label="حداکثر تخفیف (%)"
+                type="number"
+                value={form.maxDiscount}
+                onChange={e => setForm({ ...form, maxDiscount: Number(e.target.value) })}
+              />
 
               {/* Permissions */}
               <div>
-                <label className="text-xs text-slate-500 flex items-center gap-1"><Shield size={12} /> دسترسی‌ها</label>
-                <div className="mt-2 max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-600 rounded-lg p-2 space-y-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block flex items-center gap-2">
+                  <Shield size={16} />
+                  دسترسی‌ها
+                </label>
+                <div className="max-h-48 overflow-y-auto border-2 border-slate-200 dark:border-slate-600 rounded-xl p-3 space-y-2">
                   {getAllPermissions().map(perm => (
-                    <label key={perm} className="flex items-center gap-2 text-xs">
-                      <input type="checkbox" checked={form.permissions.includes(perm)}
+                    <label key={perm} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 p-2 rounded-lg">
+                      <input 
+                        type="checkbox" 
+                        checked={form.permissions.includes(perm)}
                         onChange={e => {
                           const perms = e.target.checked ? [...form.permissions, perm] : form.permissions.filter(p => p !== perm);
                           setForm({ ...form, permissions: perms });
-                        }} className="rounded" />
-                      {perm}
+                        }} 
+                        className="w-4 h-4 rounded" 
+                      />
+                      <span className="text-xs font-mono">{perm}</span>
                     </label>
                   ))}
                 </div>
@@ -206,29 +294,43 @@ export default function UsersPage() {
 
               {/* Visible Pages */}
               <div>
-                <label className="text-xs text-slate-500">صفحات قابل مشاهده</label>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">صفحات قابل مشاهده</label>
+                <div className="flex flex-wrap gap-2">
                   {getAllPages().map(page => (
-                    <label key={page} className="flex items-center gap-1 text-xs bg-slate-50 dark:bg-slate-700 px-2 py-1 rounded">
-                      <input type="checkbox" checked={form.visiblePages.includes(page)}
+                    <label key={page} className="flex items-center gap-1 text-xs bg-slate-50 dark:bg-slate-700 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600">
+                      <input 
+                        type="checkbox" 
+                        checked={form.visiblePages.includes(page)}
                         onChange={e => {
                           const pages = e.target.checked ? [...form.visiblePages, page] : form.visiblePages.filter(p => p !== page);
                           setForm({ ...form, visiblePages: pages });
-                        }} className="rounded" />
-                      {page}
+                        }} 
+                        className="w-4 h-4 rounded" 
+                      />
+                      <span>{page}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} className="rounded" />
-                فعال
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={form.active} 
+                  onChange={e => setForm({ ...form, active: e.target.checked })} 
+                  className="w-5 h-5 rounded" 
+                />
+                <span className="text-sm font-medium">فعال</span>
               </label>
 
-              <button onClick={save} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium">
-                {editUser ? 'ذخیره تغییرات' : 'ایجاد کاربر'}
-              </button>
+              <div className="flex gap-3 pt-4">
+                <Button variant="outline" className="flex-1" onClick={() => setShowForm(false)}>
+                  انصراف
+                </Button>
+                <Button variant="primary" className="flex-1" onClick={save}>
+                  {editUser ? 'ذخیره تغییرات' : 'ایجاد کاربر'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

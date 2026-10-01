@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, useToast, formatCurrency, toJalali } from '../lib/auth';
-import { db, type Purchase, type PurchaseItem, type ProductSerial } from '../lib/db';
+import { db, type Purchase, type PurchaseItem } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Search, X, Truck } from 'lucide-react';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import { 
+  Plus, Search, X, Truck, Package, DollarSign, Eye
+} from 'lucide-react';
 
 export default function Purchases() {
   const { user, hasPermission } = useAuth();
@@ -12,6 +16,7 @@ export default function Purchases() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [items, setItems] = useState<PurchaseItem[]>([]);
+  const [viewPurchase, setViewPurchase] = useState<Purchase | null>(null);
   const [form, setForm] = useState({
     supplierName: '', date: new Date().toISOString().split('T')[0],
     dollarRate: 0, paid: 0, notes: '',
@@ -26,57 +31,6 @@ export default function Purchases() {
 
   const addItem = () => {
     setItems([...items, { id: uuidv4(), productId: '', productName: '', quantity: 1, buyPrice: 0, total: 0, imeis: [] }]);
-  };
-
-  const addManualProduct = () => {
-    const name = prompt('نام کالا:');
-    if (!name) return;
-    const brand = prompt('برند:', '') || '';
-    const model = prompt('مدل:', '') || '';
-    const qtyStr = prompt('تعداد:', '1');
-    if (!qtyStr) return;
-    const quantity = parseInt(qtyStr) || 1;
-    const priceStr = prompt('قیمت خرید:', '0');
-    if (!priceStr) return;
-    const buyPrice = parseInt(priceStr) || 0;
-    
-    // ایجاد محصول جدید
-    const newProduct = {
-      id: uuidv4(),
-      name,
-      brand,
-      model,
-      category: 'موبایل',
-      sku: '',
-      barcode: '',
-      imeiRequired: false,
-      serialRequired: false,
-      color: '',
-      storage: '',
-      description: '',
-      buyPrice,
-      sellPrice: Math.round(buyPrice * 1.15),
-      minStock: 1,
-      stock: 0,
-      status: 'active' as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    db.saveProduct(newProduct as any);
-    
-    // اضافه کردن به لیست خرید
-    setItems([...items, {
-      id: uuidv4(),
-      productId: newProduct.id,
-      productName: name,
-      quantity,
-      buyPrice,
-      total: buyPrice * quantity,
-      imeis: []
-    }]);
-    
-    showToast('success', `${name} ایجاد و اضافه شد`);
   };
 
   const updateItem = (idx: number, field: string, value: unknown) => {
@@ -114,7 +68,6 @@ export default function Purchases() {
 
     db.savePurchase(purchase);
 
-    // Update products stock
     items.forEach(item => {
       if (item.productId) {
         const product = db.getProduct(item.productId);
@@ -127,19 +80,17 @@ export default function Purchases() {
         }
       }
 
-      // Save IMEIs
       item.imeis.forEach(imei => {
         if (imei.trim()) {
-          const serial: ProductSerial = {
+          const serial = {
             id: uuidv4(), productId: item.productId, imei1: imei.trim(),
-            imei2: '', serial: '', status: 'available', purchaseId: purchase.id,
+            imei2: '', serial: '', status: 'available' as const, purchaseId: purchase.id,
             createdAt: new Date().toISOString(),
           };
           db.saveSerial(serial);
         }
       });
 
-      // Stock movement
       db.saveStockMovement({
         id: uuidv4(), productId: item.productId, productName: item.productName,
         type: 'in', quantity: item.quantity, reference: purchase.invoiceNumber,
@@ -163,120 +114,342 @@ export default function Purchases() {
     loadPurchases();
   };
 
+  const addManualProduct = () => {
+    const name = prompt('نام کالا:');
+    if (!name) return;
+    const priceStr = prompt('قیمت خرید:', '0');
+    const price = parseInt(priceStr || '0') || 0;
+    const qtyStr = prompt('تعداد:', '1');
+    const qty = parseInt(qtyStr || '1') || 1;
+    
+    let product = db.getProducts().find(p => p.name === name);
+    if (!product) {
+      product = {
+        id: uuidv4(), name, brand: '', model: '', category: 'موبایل',
+        sku: '', barcode: '', imeiRequired: false, serialRequired: false,
+        color: '', storage: '', description: '', buyPrice: price,
+        sellPrice: Math.round(price * 1.15), minStock: 1, stock: 0,
+        status: 'active' as const, dollarRateAtPurchase: Number(form.dollarRate) || 0,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      db.saveProduct(product);
+      showToast('info', `کالای "${name}" ایجاد شد`);
+    }
+    
+    setItems([...items, {
+      id: uuidv4(), productId: product.id, productName: product.name,
+      quantity: qty, buyPrice: price, total: qty * price, imeis: [],
+    }]);
+  };
+
+  const totalPurchases = purchases.reduce((sum, p) => sum + p.total, 0);
+  const totalPaid = purchases.reduce((sum, p) => sum + p.paid, 0);
+  const totalRemaining = purchases.reduce((sum, p) => sum + p.remaining, 0);
+
   return (
-    <div className="space-y-4 pb-20 lg:pb-0">
+    <div className="space-y-6 pb-20 lg:pb-0 animate-fadeIn">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">خرید</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">خرید</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">مدیریت خرید از تأمین‌کنندگان</p>
+        </div>
         {hasPermission('purchases.create') && (
-          <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
-            <Plus size={16} /> خرید جدید
-          </button>
+          <Button variant="primary" onClick={() => setShowForm(true)}>
+            <Plus size={18} />
+            خرید جدید
+          </Button>
         )}
       </div>
 
-      <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-        placeholder="جستجو..." className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+              <Truck size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">جمع خرید</p>
+              <p className="text-lg font-bold text-blue-600">{formatCurrency(totalPurchases, settings.currency)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+              <DollarSign size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">پرداخت شده</p>
+              <p className="text-lg font-bold text-green-600">{formatCurrency(totalPaid, settings.currency)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
+              <DollarSign size={24} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">بدهی به تأمین‌کنندگان</p>
+              <p className="text-lg font-bold text-red-600">{formatCurrency(totalRemaining, settings.currency)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <div className="space-y-2">
+      {/* Search */}
+      <div className="card p-5">
+        <div className="relative">
+          <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input 
+            type="text" 
+            value={search} 
+            onChange={e => setSearch(e.target.value)}
+            placeholder="جستجو شماره فاکتور یا تأمین‌کننده..." 
+            className="input pr-12" 
+          />
+        </div>
+      </div>
+
+      {/* Purchases List */}
+      <div className="space-y-3">
         {filtered.map(p => (
-          <div key={p.id} className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center justify-between">
+          <div key={p.id} className="card p-5 hover:shadow-lg transition-shadow">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="font-bold text-sm">خرید #{p.invoiceNumber}</p>
-                <p className="text-xs text-slate-500 mt-1">{p.supplierName} | {toJalali(p.date)}</p>
-                <p className="text-xs text-slate-500">{p.items.length} کالا {p.dollarRate > 0 && `| دلار: ${formatCurrency(p.dollarRate, '')}`}</p>
+                <p className="font-bold text-lg text-slate-900 dark:text-white">
+                  خرید #{p.invoiceNumber}
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                  {p.supplierName} | {toJalali(p.date)}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {p.items.length} کالا 
+                  {p.dollarRate > 0 && ` | دلار: ${formatCurrency(p.dollarRate, '')}`}
+                </p>
               </div>
               <div className="text-left">
-                <p className="font-bold text-sm">{formatCurrency(p.total, settings.currency)}</p>
-                {p.remaining > 0 && <p className="text-xs text-red-500">بدهی: {formatCurrency(p.remaining, settings.currency)}</p>}
+                <p className="text-xl font-bold text-slate-900 dark:text-white">
+                  {formatCurrency(p.total, settings.currency)}
+                </p>
+                {p.remaining > 0 && (
+                  <p className="text-sm text-red-500 mt-1">
+                    بدهی: {formatCurrency(p.remaining, settings.currency)}
+                  </p>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setViewPurchase(p)} className="mt-2">
+                  <Eye size={14} />
+                  مشاهده
+                </Button>
               </div>
             </div>
           </div>
         ))}
-        {filtered.length === 0 && <p className="text-center text-slate-500 py-8">خریدی یافت نشد</p>}
+        {filtered.length === 0 && (
+          <div className="card p-12 text-center">
+            <Truck size={64} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+            <p className="text-lg font-medium text-slate-500 dark:text-slate-400">خریدی یافت نشد</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+              {search ? 'جستجوی خود را تغییر دهید' : 'اولین خرید خود را ثبت کنید'}
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* View Purchase Modal */}
+      {viewPurchase && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white dark:bg-slate-800 p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-10">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                خرید #{viewPurchase.invoiceNumber}
+              </h3>
+              <button onClick={() => setViewPurchase(null)} className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 p-2 rounded-lg">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">تأمین‌کننده</p>
+                  <p className="font-medium">{viewPurchase.supplierName}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">تاریخ</p>
+                  <p className="font-medium">{toJalali(viewPurchase.date)}</p>
+                </div>
+                {viewPurchase.dollarRate > 0 && (
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">نرخ دلار</p>
+                    <p className="font-medium">{formatCurrency(viewPurchase.dollarRate, settings.currency)}</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-slate-900 dark:text-white mb-2">کالاها</p>
+                <div className="space-y-2">
+                  {viewPurchase.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium">{item.productName}</p>
+                        <p className="text-xs text-slate-500">
+                          {item.quantity} × {formatCurrency(item.buyPrice, settings.currency)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-bold">{formatCurrency(item.total, settings.currency)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">جمع کل</p>
+                  <p className="text-lg font-bold text-blue-600">{formatCurrency(viewPurchase.total, settings.currency)}</p>
+                </div>
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">پرداخت شده</p>
+                  <p className="text-lg font-bold text-green-600">{formatCurrency(viewPurchase.paid, settings.currency)}</p>
+                </div>
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">مانده</p>
+                  <p className="text-lg font-bold text-red-600">{formatCurrency(viewPurchase.remaining, settings.currency)}</p>
+                </div>
+              </div>
+
+              {viewPurchase.notes && (
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">یادداشت</p>
+                  <p className="text-sm">{viewPurchase.notes}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-slate-800 p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-10">
-              <h3 className="font-bold">خرید جدید</h3>
-              <button onClick={() => setShowForm(false)} className="text-slate-500"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white dark:bg-slate-800 p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-10">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">خرید جدید</h3>
+              <button onClick={() => setShowForm(false)} className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 p-2 rounded-lg">
+                <X size={24} />
+              </button>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-500">تأمین‌کننده *</label>
-                  <input type="text" value={form.supplierName} onChange={e => setForm({ ...form, supplierName: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500">تاریخ</label>
-                  <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500">نرخ دلار</label>
-                  <input type="number" value={form.dollarRate} onChange={e => setForm({ ...form, dollarRate: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500">مبلغ پرداختی</label>
-                  <input type="number" value={form.paid} onChange={e => setForm({ ...form, paid: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-                </div>
+                <Input
+                  label="تأمین‌کننده *"
+                  value={form.supplierName}
+                  onChange={e => setForm({ ...form, supplierName: e.target.value })}
+                />
+                <Input
+                  label="تاریخ"
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm({ ...form, date: e.target.value })}
+                />
+                <Input
+                  label="نرخ دلار"
+                  type="number"
+                  value={form.dollarRate}
+                  onChange={e => setForm({ ...form, dollarRate: Number(e.target.value) })}
+                />
+                <Input
+                  label="مبلغ پرداختی"
+                  type="number"
+                  value={form.paid}
+                  onChange={e => setForm({ ...form, paid: Number(e.target.value) })}
+                />
               </div>
 
               {/* Items */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold">کالاها</label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-bold text-slate-900 dark:text-white">کالاها</label>
                   <div className="flex gap-2">
-                    <button onClick={addManualProduct} className="text-xs text-green-600">+ کالای جدید</button>
-                    <button onClick={addItem} className="text-xs text-blue-600">+ افزودن از لیست</button>
+                    <Button variant="outline" size="sm" onClick={addItem}>
+                      <Plus size={14} />
+                      از لیست
+                    </Button>
+                    <Button variant="success" size="sm" onClick={addManualProduct}>
+                      <Plus size={14} />
+                      ثبت دستی
+                    </Button>
                   </div>
                 </div>
                 {items.map((item, idx) => (
-                  <div key={item.id} className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg mb-2 space-y-2">
+                  <div key={item.id} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg mb-2 space-y-2">
                     <div className="grid grid-cols-3 gap-2">
-                      <select value={item.productId} onChange={e => {
-                        const p = db.getProduct(e.target.value);
-                        updateItem(idx, 'productId', e.target.value);
-                        if (p) { updateItem(idx, 'productName', p.name); updateItem(idx, 'buyPrice', p.buyPrice); }
-                      }}
-                        className="col-span-2 px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded text-xs bg-white dark:bg-slate-700">
+                      <select 
+                        value={item.productId} 
+                        onChange={e => {
+                          const p = db.getProduct(e.target.value);
+                          updateItem(idx, 'productId', e.target.value);
+                          if (p) { updateItem(idx, 'productName', p.name); updateItem(idx, 'buyPrice', p.buyPrice); }
+                        }}
+                        className="input col-span-2"
+                      >
                         <option value="">انتخاب کالا</option>
                         {db.getProducts().map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
-                      <button onClick={() => removeItem(idx)} className="text-red-500 text-xs"><X size={14} /></button>
+                      <Button variant="danger" size="sm" onClick={() => removeItem(idx)}>
+                        <X size={14} />
+                      </Button>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <input type="number" placeholder="تعداد" value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))}
-                        className="px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded text-xs bg-white dark:bg-slate-700" />
-                      <input type="number" placeholder="قیمت خرید" value={item.buyPrice} onChange={e => updateItem(idx, 'buyPrice', Number(e.target.value))}
-                        className="px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded text-xs bg-white dark:bg-slate-700" />
-                      <span className="text-xs flex items-center justify-center">{formatCurrency(item.total, settings.currency)}</span>
+                      <input 
+                        type="number" 
+                        placeholder="تعداد" 
+                        value={item.quantity} 
+                        onChange={e => updateItem(idx, 'quantity', Number(e.target.value))}
+                        className="input" 
+                      />
+                      <input 
+                        type="number" 
+                        placeholder="قیمت خرید" 
+                        value={item.buyPrice} 
+                        onChange={e => updateItem(idx, 'buyPrice', Number(e.target.value))}
+                        className="input" 
+                      />
+                      <span className="flex items-center justify-center text-sm font-bold">
+                        {formatCurrency(item.total, settings.currency)}
+                      </span>
                     </div>
-                    <input type="text" placeholder="IMEI (با کاما جدا کنید)" value={item.imeis.join(',')}
+                    <input 
+                      type="text" 
+                      placeholder="IMEI (با کاما جدا کنید)" 
+                      value={item.imeis.join(',')}
                       onChange={e => updateItem(idx, 'imeis', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                      className="w-full px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded text-xs bg-white dark:bg-slate-700" />
+                      className="input" 
+                    />
                   </div>
                 ))}
               </div>
 
-              <div className="flex justify-between text-sm bg-slate-50 dark:bg-slate-700/50 p-2 rounded">
-                <span>جمع کل:</span>
-                <span className="font-bold">{formatCurrency(subtotal, settings.currency)}</span>
+              <div className="flex justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <span className="font-bold">جمع کل:</span>
+                <span className="text-xl font-bold text-blue-600">{formatCurrency(subtotal, settings.currency)}</span>
               </div>
 
               <div>
-                <label className="text-xs text-slate-500">یادداشت</label>
-                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" rows={2} />
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">یادداشت</label>
+                <textarea 
+                  value={form.notes} 
+                  onChange={e => setForm({ ...form, notes: e.target.value })}
+                  className="input" 
+                  rows={2} 
+                />
               </div>
 
-              <button onClick={save} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium">ثبت خرید</button>
+              <Button variant="primary" size="lg" className="w-full" onClick={save}>
+                ثبت خرید
+              </Button>
             </div>
           </div>
         </div>
