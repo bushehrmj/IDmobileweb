@@ -156,9 +156,47 @@ export default function RepairForm({ repair, initialSettled = false, onSave, onC
     const priceStr = prompt('قیمت واحد (تومان):', '0');
     const price = parseInt(priceStr || '0') || 0;
     
+    // بررسی آیا قطعه در انبار وجود دارد
+    let product = db.getProducts().find(p => p.name === name);
+    
+    // اگر قطعه در انبار نیست، خودکار اضافه شود
+    if (!product) {
+      product = {
+        id: uuidv4(),
+        name,
+        brand: '',
+        model: '',
+        category: 'قطعات',
+        sku: '',
+        barcode: '',
+        imeiRequired: false,
+        serialRequired: false,
+        color: '',
+        storage: '',
+        description: 'قطعه تعمیراتی',
+        buyPrice: price,
+        sellPrice: Math.round(price * 1.3),
+        minStock: 1,
+        stock: qty, // موجودی اولیه = تعداد مورد نیاز
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.saveProduct(product);
+      showToast('success', `قطعه "${name}" به انبار اضافه شد`);
+    } else {
+      // اگر قطعه وجود دارد ولی موجودی کافی نیست، اضافه شود
+      if (product.stock < qty) {
+        product.stock += qty;
+        product.updatedAt = new Date().toISOString();
+        db.saveProduct(product);
+        showToast('info', `موجودی قطعه "${name}" به‌روزرسانی شد`);
+      }
+    }
+    
     const part: RepairPart = {
       id: uuidv4(),
-      productId: '',
+      productId: product.id,
       productName: name,
       quantity: qty,
       price,

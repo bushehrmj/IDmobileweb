@@ -64,6 +64,8 @@ export default function Repairs() {
   const [printRepairId, setPrintRepairId] = useState<string | null>(null);
   const [printType, setPrintType] = useState<'receipt' | 'invoice'>('receipt');
   const [settled, setSettled] = useState(false);
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [lastSavedRepairId, setLastSavedRepairId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   useEffect(() => { loadRepairs(); }, []);
@@ -106,6 +108,9 @@ export default function Repairs() {
     } else {
       db.saveRepair(finalRepairData);
       showToast('success', 'تعمیر ثبت شد');
+      // نمایش گزینه‌های چاپ برای تعمیر جدید
+      setLastSavedRepairId(finalRepairData.id);
+      setShowPrintOptions(true);
     }
 
     // اضافه کردن مشتری به لیست مشتریان
@@ -216,6 +221,38 @@ export default function Repairs() {
         customer.invoiceCount += 1;
         customer.lastPurchase = new Date().toISOString();
         db.saveCustomer(customer);
+        
+        // کاهش موجودی قطعات از انبار
+        if (finalRepairData.parts && finalRepairData.parts.length > 0) {
+          finalRepairData.parts.forEach(part => {
+            if (part.productId) {
+              const product = db.getProduct(part.productId);
+              if (product) {
+                product.stock -= part.quantity;
+                if (product.stock < 0) product.stock = 0;
+                product.updatedAt = new Date().toISOString();
+                db.saveProduct(product);
+                
+                // ثبت حرکت انبار
+                db.saveStockMovement({
+                  id: uuidv4(),
+                  productId: product.id,
+                  productName: product.name,
+                  type: 'out',
+                  quantity: part.quantity,
+                  reference: finalRepairData.ticketNumber,
+                  referenceType: 'repair',
+                  referenceId: finalRepairData.id,
+                  userId: user?.id || '',
+                  userName: user?.fullName || '',
+                  date: new Date().toISOString(),
+                  notes: `مصرف در تعمیر - تحویل به مشتری`,
+                });
+              }
+            }
+          });
+          showToast('success', `موجودی قطعات از انبار کسر شد`);
+        }
         
         showToast('success', `فاکتور فروش #${sale.invoiceNumber} برای تعمیر ایجاد و تسویه شد`);
       }
@@ -496,6 +533,60 @@ export default function Repairs() {
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditRepair(null); setSettled(false); }}
         />
+      )}
+
+      {/* Print Options Modal - After saving new repair */}
+      {showPrintOptions && lastSavedRepairId && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-6 animate-scaleIn">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={32} className="text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">تعمیر با موفقیت ثبت شد</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">آیا می‌خواهید رسید یا فاکتور را چاپ کنید؟</p>
+            </div>
+            
+            <div className="space-y-3">
+              <Button 
+                variant="primary" 
+                className="w-full"
+                onClick={() => {
+                  setPrintRepairId(lastSavedRepairId);
+                  setPrintType('receipt');
+                  setShowPrintOptions(false);
+                }}
+              >
+                <Printer size={18} />
+                چاپ رسید پذیرش
+              </Button>
+              
+              <Button 
+                variant="success" 
+                className="w-full"
+                onClick={() => {
+                  setPrintRepairId(lastSavedRepairId);
+                  setPrintType('invoice');
+                  setShowPrintOptions(false);
+                }}
+              >
+                <Printer size={18} />
+                چاپ فاکتور
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  setShowPrintOptions(false);
+                  setLastSavedRepairId(null);
+                }}
+              >
+                بعداً چاپ می‌کنم
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Print Modal */}
