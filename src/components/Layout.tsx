@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth, toJalaliFull } from '../lib/auth';
-import { db, type Settings } from '../lib/db';
-import {
+import React, { useState } from 'react';
+import { useAuth } from '../lib/auth';
+import { 
   LayoutDashboard, ShoppingCart, Users, Package, Warehouse,
   Truck, Wrench, CreditCard, BarChart3, UserCog, Settings as SettingsIcon,
-  Database, LogOut, Menu, X, Search, Bell, Moon, Sun, ChevronDown, ChevronLeft,
-  BookOpen, ArrowRightLeft, FileText, DollarSign, Wallet, TrendingUp, PieChart
+  Database, LogOut, Menu, X, Search, Bell, Moon, Sun, ChevronDown,
+  DollarSign, BookOpen, ArrowRightLeft, FileText, Wallet, PieChart
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -14,15 +13,7 @@ interface LayoutProps {
   onNavigate: (page: string) => void;
 }
 
-interface MenuItem {
-  id: string;
-  label: string;
-  icon: any;
-  permission: string;
-  children?: MenuItem[];
-}
-
-const menuItems: MenuItem[] = [
+const menuItems = [
   { id: 'dashboard', label: 'داشبورد', icon: LayoutDashboard, permission: 'dashboard.view' },
   { id: 'sales', label: 'فروش', icon: ShoppingCart, permission: 'sales.view' },
   { id: 'customers', label: 'مشتریان', icon: Users, permission: 'customers.view' },
@@ -53,27 +44,9 @@ const menuItems: MenuItem[] = [
 ];
 
 export default function Layout({ children, currentPage, onNavigate }: LayoutProps) {
-  const { user, hasPermission, canViewPage, logout } = useAuth();
+  const { user, hasPermission, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [minimized, setMinimized] = useState(false);
-  const [settings, setSettings] = useState<Settings>(db.getSettings());
-  const [showProfile, setShowProfile] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [notifications, setNotifications] = useState<string[]>([]);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['financial']);
-
-  useEffect(() => {
-    setSettings(db.getSettings());
-    const notifs: string[] = [];
-    const products = db.getProducts();
-    const lowStock = products.filter(p => p.stock <= p.minStock && p.minStock > 0);
-    if (lowStock.length > 0) notifs.push(`${lowStock.length} کالا موجودی کم دارد`);
-    const repairs = db.getRepairs().filter(r => r.status === 'ready_for_delivery');
-    if (repairs.length > 0) notifs.push(`${repairs.length} تعمیر آماده تحویل`);
-    const customers = db.getCustomers().filter(c => c.debt > 0);
-    if (customers.length > 0) notifs.push(`${customers.length} مشتری بدهکار`);
-    setNotifications(notifs);
-  }, [currentPage]);
 
   const toggleMenu = (menuId: string) => {
     setExpandedMenus(prev =>
@@ -81,79 +54,16 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
     );
   };
 
-  const filteredMenu = menuItems.filter(item =>
-    hasPermission(item.permission) && canViewPage(item.id)
-  );
+  const filteredMenu = menuItems.filter(item => hasPermission(item.permission));
 
-  const handleLogout = () => logout();
-
-  const toggleDarkMode = () => {
-    const newTheme = settings.theme === 'light' ? 'dark' : 'light';
-    const newSettings: Settings = { ...settings, theme: newTheme as 'light' | 'dark' };
-    db.saveSettings(newSettings);
-    setSettings(newSettings);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  };
-
-  // Global search
-  const searchResults = searchQuery.length > 1 ? (() => {
-    const results: { type: string; label: string; id: string; page: string }[] = [];
-    const q = searchQuery.toLowerCase();
-    if (hasPermission('products.view')) {
-      db.getProducts().filter(p => p.name.includes(q) || p.barcode?.includes(q) || p.brand?.includes(q)).slice(0, 5)
-        .forEach(p => results.push({ type: 'کالا', label: `${p.name} - ${p.brand}`, id: p.id, page: 'products' }));
-    }
-    if (hasPermission('customers.view')) {
-      db.getCustomers().filter(c => c.firstName.includes(q) || c.lastName.includes(q) || c.mobile?.includes(q)).slice(0, 5)
-        .forEach(c => results.push({ type: 'مشتری', label: `${c.firstName} ${c.lastName}`, id: c.id, page: 'customers' }));
-    }
-    if (hasPermission('repairs.view')) {
-      db.getRepairs().filter(r => r.ticketNumber.includes(q) || r.customerName.includes(q) || r.imei?.includes(q)).slice(0, 5)
-        .forEach(r => results.push({ type: 'تعمیر', label: `#${r.ticketNumber} - ${r.customerName}`, id: r.id, page: 'repairs' }));
-    }
-    return results;
-  })() : [];
-
-  const sidebarWidth = minimized ? 'w-16' : 'w-64';
-
-  const renderMenuItem = (item: MenuItem, isChild = false) => {
+  const renderMenuItem = (item: any, isChild = false) => {
     const isActive = currentPage === item.id;
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedMenus.includes(item.id);
 
-    // Filter children based on permissions
     const visibleChildren = hasChildren
-      ? item.children!.filter(child => hasPermission(child.permission) && canViewPage(child.id))
+      ? item.children.filter((child: any) => hasPermission(child.permission))
       : [];
-
-    if (minimized && !isChild) {
-      // Minimized mode - only icons
-      return (
-        <button
-          key={item.id}
-          onClick={() => {
-            if (hasChildren) {
-              setMinimized(false);
-              toggleMenu(item.id);
-            } else {
-              onNavigate(item.id);
-            }
-          }}
-          className={`w-full flex items-center justify-center p-3 rounded-lg mb-1 transition-colors relative group ${
-            isActive
-              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-          }`}
-          title={item.label}
-        >
-          <item.icon size={20} />
-          {/* Tooltip */}
-          <span className="absolute right-full mr-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-            {item.label}
-          </span>
-        </button>
-      );
-    }
 
     return (
       <div key={item.id}>
@@ -166,27 +76,25 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
               setSidebarOpen(false);
             }
           }}
-          className={`w-full flex items-center ${isChild ? 'pr-10' : 'pr-3'} py-2.5 rounded-lg text-sm mb-1 transition-colors ${
+          className={`w-full flex items-center ${isChild ? 'pr-12' : 'pr-4'} py-3 rounded-xl text-sm mb-1 transition-all duration-300 group ${
             isActive
-              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              ? 'bg-gradient-to-l from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-gradient-to-l hover:from-blue-50 hover:to-indigo-50 dark:hover:from-slate-800 dark:hover:to-slate-700'
           }`}
         >
-          <item.icon size={18} className={isChild ? 'ml-2' : 'ml-3'} />
-          {!isChild && <span className="flex-1 text-right">{item.label}</span>}
-          {isChild && <span className="flex-1 text-right text-xs">{item.label}</span>}
+          <item.icon size={20} className={`${isChild ? 'ml-3' : 'ml-4'} transition-transform duration-300 group-hover:scale-110`} />
+          <span className="flex-1 text-right font-medium">{item.label}</span>
           {hasChildren && (
             <ChevronDown
-              size={14}
-              className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              size={16}
+              className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
             />
           )}
         </button>
 
-        {/* Children */}
         {hasChildren && isExpanded && visibleChildren.length > 0 && (
-          <div className="mr-2 border-r-2 border-blue-200 dark:border-blue-800 pr-1 mb-1">
-            {visibleChildren.map(child => renderMenuItem(child, true))}
+          <div className="mr-4 border-r-2 border-blue-200 dark:border-blue-800 pr-2 mb-2 animate-fadeIn">
+            {visibleChildren.map((child: any) => renderMenuItem(child, true))}
           </div>
         )}
       </div>
@@ -194,190 +102,108 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
   };
 
   return (
-    <div className={`min-h-screen ${settings.theme === 'dark' ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
+    <div className="min-h-screen flex">
       {/* Sidebar */}
-      <aside className={`fixed top-0 right-0 h-full ${sidebarWidth} bg-white dark:bg-slate-800 shadow-xl z-50 transform transition-all duration-300 ${
+      <aside className={`fixed top-0 right-0 h-full w-72 bg-white dark:bg-slate-900 shadow-2xl z-50 transform transition-transform duration-300 ${
         sidebarOpen ? 'translate-x-0' : 'translate-x-full'
       } lg:translate-x-0`}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className={`p-4 border-b border-slate-200 dark:border-slate-700 ${minimized ? 'px-2' : ''}`}>
-            <div className="flex items-center justify-between">
-              <div className={`flex items-center ${minimized ? 'justify-center w-full' : 'gap-2'}`}>
-                {settings.logo ? (
-                  <img src={settings.logo} alt="Logo" className="w-8 h-8 rounded" />
-                ) : (
-                  <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">ID</div>
-                )}
-                {!minimized && (
-                  <div>
-                    <h1 className="font-bold text-sm text-blue-800 dark:text-blue-400">{settings.storeName}</h1>
-                    <p className="text-[10px] text-slate-500">Manager Pro</p>
-                  </div>
-                )}
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30 animate-float">
+                ID
               </div>
-              {!minimized && (
-                <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1">
-                  <X size={20} />
-                </button>
-              )}
+              <div>
+                <h1 className="font-bold text-lg gradient-text">ID Mobile</h1>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Manager Pro</p>
+              </div>
             </div>
           </div>
 
-          {/* Minimize Button */}
-          <button
-            onClick={() => setMinimized(!minimized)}
-            className="hidden lg:flex items-center justify-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 border-b border-slate-200 dark:border-slate-700"
-            title={minimized ? 'باز کردن منو' : 'بستن منو'}
-          >
-            <ChevronLeft size={18} className={`transition-transform ${minimized ? 'rotate-180' : ''}`} />
-          </button>
-
           {/* Menu */}
-          <nav className={`flex-1 overflow-y-auto p-2 ${minimized ? 'px-1' : ''}`}>
+          <nav className="flex-1 overflow-y-auto p-4 space-y-1">
             {filteredMenu.map(item => renderMenuItem(item))}
           </nav>
 
-          {/* User info */}
-          <div className={`p-3 border-t border-slate-200 dark:border-slate-700 ${minimized ? 'px-1' : ''}`}>
-            {minimized ? (
-              <button onClick={handleLogout} className="w-full flex items-center justify-center p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded" title="خروج">
+          {/* User Info */}
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3 p-3 bg-gradient-to-l from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 rounded-xl">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+                {user?.fullName?.charAt(0) || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{user?.fullName}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{user?.role === 'admin' ? 'مدیر سیستم' : user?.role}</p>
+              </div>
+              <button 
+                onClick={logout}
+                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-300 hover:scale-110"
+                title="خروج"
+              >
                 <LogOut size={18} />
               </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold">
-                  {user?.fullName?.charAt(0) || 'U'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate">{user?.fullName}</p>
-                  <p className="text-[10px] text-slate-500">{user?.role === 'admin' ? 'مدیر' : user?.role === 'manager' ? 'مدیر فروشگاه' : user?.role === 'seller' ? 'فروشنده' : user?.role === 'technician' ? 'تعمیرکار' : 'انباردار'}</p>
-                </div>
-                <button onClick={handleLogout} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded" title="خروج">
-                  <LogOut size={16} />
-                </button>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className={`lg:${sidebarWidth} min-h-screen flex flex-col transition-all duration-300`} style={{ marginRight: minimized ? '4rem' : undefined }}>
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden animate-fadeIn"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 lg:mr-72">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
-                <Menu size={20} />
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all duration-300"
+              >
+                <Menu size={24} />
               </button>
-              <h2 className="text-lg font-bold hidden sm:block">
-                {menuItems.find(m => m.id === currentPage)?.label ||
-                  menuItems.find(m => m.children?.some(c => c.id === currentPage))?.children?.find(c => c.id === currentPage)?.label ||
-                  'داشبورد'}
+              <h2 className="text-2xl font-bold gradient-text">
+                {menuItems.find(m => m.id === currentPage)?.label || 'داشبورد'}
               </h2>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {/* Search */}
-              <div className="relative hidden sm:block">
-                <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
+              <div className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2">
+                <Search size={18} className="text-slate-400" />
+                <input 
+                  type="text" 
                   placeholder="جستجو..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pr-9 pl-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 w-48 focus:w-64 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="bg-transparent outline-none text-sm w-48"
                 />
-                {searchResults.length > 0 && (
-                  <div className="absolute top-full mt-1 right-0 w-72 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 max-h-64 overflow-y-auto z-50">
-                    {searchResults.map((r, i) => (
-                      <button key={i} onClick={() => { onNavigate(r.page); setSearchQuery(''); }}
-                        className="w-full px-3 py-2 text-right text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
-                        <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">{r.type}</span>
-                        <span className="truncate">{r.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {/* Notifications */}
-              <div className="relative">
-                <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg relative">
-                  <Bell size={18} />
-                  {notifications.length > 0 && (
-                    <span className="absolute top-1 left-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center">{notifications.length}</span>
-                  )}
-                </button>
-              </div>
-
-              {/* Theme toggle */}
-              <button onClick={toggleDarkMode} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
-                {settings.theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all duration-300 relative">
+                <Bell size={20} />
+                <span className="absolute top-1 left-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
               </button>
 
-              {/* Profile */}
-              <div className="relative">
-                <button onClick={() => setShowProfile(!showProfile)} className="flex items-center gap-1 p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
-                  <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold">
-                    {user?.fullName?.charAt(0) || 'U'}
-                  </div>
-                  <ChevronDown size={14} />
-                </button>
-                {showProfile && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50">
-                    <div className="p-3 border-b border-slate-200 dark:border-slate-700">
-                      <p className="font-medium text-sm">{user?.fullName}</p>
-                      <p className="text-xs text-slate-500">@{user?.username}</p>
-                    </div>
-                    <button onClick={() => { onNavigate('settings'); setShowProfile(false); }}
-                      className="w-full px-3 py-2 text-right text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
-                      <SettingsIcon size={14} /> تنظیمات
-                    </button>
-                    <button onClick={handleLogout}
-                      className="w-full px-3 py-2 text-right text-sm hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 flex items-center gap-2">
-                      <LogOut size={14} /> خروج
-                    </button>
-                  </div>
-                )}
-              </div>
+              {/* Theme Toggle */}
+              <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all duration-300">
+                <Moon size={20} className="dark:hidden" />
+                <Sun size={20} className="hidden dark:block" />
+              </button>
             </div>
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 p-4 lg:p-6">
+        {/* Page Content */}
+        <main className="p-6 animate-fadeIn">
           {children}
         </main>
       </div>
-
-      {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 lg:hidden z-30">
-        <div className="flex items-center justify-around py-1">
-          {filteredMenu.slice(0, 5).map(item => (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-[10px] ${
-                currentPage === item.id ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'
-              }`}
-            >
-              <item.icon size={18} />
-              <span>{item.label}</span>
-            </button>
-          ))}
-          <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center gap-0.5 px-2 py-2 text-slate-500 text-[10px]">
-            <Menu size={18} />
-            <span>منو</span>
-          </button>
-        </div>
-      </nav>
     </div>
   );
 }
