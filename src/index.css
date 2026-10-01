@@ -48,6 +48,39 @@ body {
 .invoice-a5 { width: 148mm; padding: 10mm; }
 .invoice-a4 { width: 210mm; padding: 15mm; }
 
+/* Dual receipt on A5 */
+.print-a5-dual {
+  width: 148mm;
+  margin: 0 auto;
+}
+
+.print-a5-dual .receipt-copy {
+  min-height: 100mm;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  
+  .print-a5-dual {
+    width: 148mm;
+    margin: 0 auto;
+  }
+  
+  .print-a5-dual .receipt-copy {
+    page-break-inside: avoid;
+  }
+  
+  @page {
+    size: A5;
+    margin: 5mm;
+  }
+}
+
 /* Animations */
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
