@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 import { 
   LayoutDashboard, ShoppingCart, Users, Package, Warehouse,
   Truck, Wrench, CreditCard, BarChart3, UserCog, Settings as SettingsIcon,
-  Database, LogOut, Menu, X, Search, Bell, Moon, Sun, ChevronDown
+  Database, LogOut, Menu, X, Search, Bell, Moon, Sun, ChevronDown, Plus
 } from 'lucide-react';
+import GlobalSearch from './GlobalSearch';
+import QuickActions from './QuickActions';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -30,6 +32,27 @@ const menuItems = [
 export default function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const { user, hasPermission, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl + K: Global Search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      // Ctrl + N: Quick Actions
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        setQuickActionsOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const filteredMenu = menuItems.filter(item => hasPermission(item.permission));
 
@@ -126,15 +149,24 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-2">
+              {/* Global Search */}
+              <button 
+                onClick={() => setSearchOpen(true)}
+                className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-2 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+              >
                 <Search size={18} className="text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="جستجو..."
-                  className="bg-transparent outline-none text-sm w-48"
-                />
-              </div>
+                <span className="text-sm text-slate-500">جستجو...</span>
+                <kbd className="text-xs bg-white dark:bg-slate-800 px-2 py-0.5 rounded">Ctrl+K</kbd>
+              </button>
+
+              {/* Quick Actions */}
+              <button 
+                onClick={() => setQuickActionsOpen(true)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg relative"
+                title="دسترسی سریع (Ctrl+N)"
+              >
+                <Plus size={20} />
+              </button>
 
               {/* Notifications */}
               <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg relative">
@@ -156,6 +188,20 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
           {children}
         </main>
       </div>
+
+      {/* Global Search Modal */}
+      <GlobalSearch
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onNavigate={onNavigate}
+      />
+
+      {/* Quick Actions Modal */}
+      <QuickActions
+        isOpen={quickActionsOpen}
+        onClose={() => setQuickActionsOpen(false)}
+        onNavigate={onNavigate}
+      />
     </div>
   );
 }
