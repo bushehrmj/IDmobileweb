@@ -258,14 +258,45 @@ export default function Repairs() {
               <div className="text-left">
                 <p className="text-sm font-bold">{formatCurrency(r.finalTotal || r.totalCost, settings.currency)}</p>
                 {(r.remaining || 0) > 0 && <p className="text-xs text-red-500">مانده: {formatCurrency(r.remaining, settings.currency)}</p>}
-                <div className="flex items-center gap-1 mt-1">
+                <div className="flex items-center gap-2 mt-2">
                   {hasPermission('repairs.edit') && (
-                    <button onClick={() => openEdit(r)} className="text-xs text-blue-500 flex items-center gap-1"><Edit size={12} /> ویرایش</button>
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('Edit clicked:', r.id);
+                        openEdit(r);
+                      }} 
+                      className="px-3 py-1.5 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg flex items-center gap-1 transition-colors"
+                    >
+                      <Edit size={14} /> ویرایش
+                    </button>
                   )}
-                  <button onClick={() => { setPrintRepairId(r.id); setPrintType('receipt'); }}
-                    className="text-xs text-purple-500 flex items-center gap-1"><Printer size={12} /> رسید</button>
-                  <button onClick={() => { setPrintRepairId(r.id); setPrintType('invoice'); }}
-                    className="text-xs text-green-500 flex items-center gap-1"><Printer size={12} /> فاکتور</button>
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('Receipt clicked:', r.id);
+                      alert('دکمه رسید کلیک شد - ID: ' + r.id);
+                      setPrintRepairId(r.id);
+                      setPrintType('receipt');
+                    }}
+                    className="px-3 py-1.5 text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Printer size={14} /> رسید
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('Invoice clicked:', r.id);
+                      setPrintRepairId(r.id);
+                      setPrintType('invoice');
+                    }}
+                    className="px-3 py-1.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded-lg flex items-center gap-1 transition-colors"
+                  >
+                    <Printer size={14} /> فاکتور
+                  </button>
                 </div>
               </div>
             </div>
