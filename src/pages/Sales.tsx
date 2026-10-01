@@ -7,7 +7,7 @@ import Input from '../components/ui/Input';
 import { 
   Plus, Search, Trash2, Printer, ShoppingCart, X, 
   UserPlus, ScanBarcode, Eye, Minus, CreditCard, 
-  Banknote, CheckSquare, Square, Barcode, Users, Package
+  Banknote, CheckSquare, Square, Barcode, Users, Package, Edit
 } from 'lucide-react';
 import InvoicePrint from '../components/InvoicePrint';
 
@@ -39,6 +39,7 @@ export default function Sales() {
   const [saleNotes, setSaleNotes] = useState('');
   const [imeiInput, setImeiInput] = useState('');
   const [printSaleId, setPrintSaleId] = useState<string | null>(null);
+  const [editSaleId, setEditSaleId] = useState<string | null>(null);
   const barcodeRef = useRef<HTMLInputElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
 
@@ -338,6 +339,63 @@ export default function Sales() {
       db.saveCustomer(customer);
     }
     showToast('success', 'فاکتور لغو شد');
+    loadSales();
+  };
+
+  const updateSale = (saleId: string, updates: Partial<Sale>) => {
+    const sale = db.getSale(saleId);
+    if (!sale) return;
+    
+    const oldSale = { ...sale };
+    
+    // به‌روزرسانی فیلدها
+    Object.assign(sale, updates);
+    
+    // محاسبه مجدد totals
+    if (updates.discount !== undefined || updates.items) {
+      const subtotal = sale.items.reduce((sum, item) => sum + item.total, 0);
+      sale.subtotal = subtotal;
+      
+      const discountAmount = sale.discountType === 'percent' 
+        ? Math.round(subtotal * sale.discount / 100) 
+        : sale.discount;
+      sale.discount = discountAmount;
+      
+      const tax = Math.round((subtotal - discountAmount) * settings.taxRate / 100);
+      sale.tax = tax;
+      
+      const total = subtotal - discountAmount + tax;
+      sale.total = total;
+      
+      // به‌روزرسانی remaining
+      sale.remaining = total - sale.paid;
+      if (sale.remaining < 0) sale.remaining = 0;
+    }
+    
+    // به‌روزرسانی customer
+    if (updates.paid !== undefined) {
+      const customer = db.getCustomer(sale.customerId);
+      if (customer) {
+        const paidDiff = sale.paid - oldSale.paid;
+        customer.totalPaid += paidDiff;
+        customer.debt -= paidDiff;
+        if (customer.debt < 0) customer.debt = 0;
+        db.saveCustomer(customer);
+      }
+    }
+    
+    db.saveSale(sale);
+    
+    // Audit log
+    db.addAuditLog({
+      id: uuidv4(), userId: user?.id || '', userName: user?.fullName || '',
+      action: 'edit_sale', entity: 'sale', entityId: sale.id,
+      oldValue: JSON.stringify(oldSale),
+      newValue: JSON.stringify(sale),
+      ip: '127.0.0.1', date: new Date().toISOString(),
+    });
+    
+    showToast('success', 'فاکتور ویرایش شد');
     loadSales();
   };
 
@@ -893,6 +951,12 @@ export default function Sales() {
               </div>
             </div>
             <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              {hasPermission('sales.edit') && sale.status !== 'cancelled' && (
+                <Button variant="outline" size="sm" onClick={() => setEditSaleId(sale.id)}>
+                  <Edit size={14} />
+                  ویرایش
+                </Button>
+              )}
               {hasPermission('sales.print') && (
                 <Button variant="outline" size="sm" onClick={() => setPrintSaleId(sale.id)}>
                   <Eye size={14} />
@@ -919,6 +983,197 @@ export default function Sales() {
       </div>
 
       {printSaleId && <InvoicePrint saleId={printSaleId} onClose={() => setPrintSaleId(null)} />}
+      
+      {/* Edit Sale Modal */}
+      {editSaleId && (() => {
+        const sale = db.getSale(editSaleId);
+        if (!sale) return null;
+        
+        return (
+          <EditSaleModal
+            sale={sale}
+            onClose={() => setEditSaleId(null)}
+            onSave={(updates) => {
+              updateSale(editSaleId, updates);
+              setEditSaleId(null);
+            }}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+// Edit Sale Modal Component
+function EditSaleModal({ sale, onClose, onSave }: { 
+  sale: Sale; 
+  onClose: () => void; 
+  onSave: (updates: Partial<Sale>) => void 
+}) {
+  const [discount, setDiscount] = useState(sale.discount);
+  const [discountType, setDiscountType] = useState(sale.discountType);
+  const [paid, setPaid] = useState(sale.paid);
+  const [paymentMethod, setPaymentMethod] = useState(sale.paymentMethod);
+  const [notes, setNotes] = useState(sale.notes);
+  const [status, setStatus] = useState(sale.status);
+
+  const settings = db.getSettings();
+
+  const handleSave = () => {
+    onSave({
+      discount,
+      discountType,
+      paid,
+      paymentMethod,
+      notes,
+      status,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scaleIn">
+        <div className="sticky top-0 bg-white dark:bg-slate-800 p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-10">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+            ویرایش فاکتور #{sale.invoiceNumber}
+          </h3>
+          <button onClick={onClose} className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 p-2 rounded-lg">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Customer Info (Read-only) */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">مشتری</p>
+            <p className="font-bold text-slate-900 dark:text-white">{sale.customerName}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {new Date(sale.date).toLocaleDateString('fa-IR')} - {sale.time}
+            </p>
+          </div>
+
+          {/* Items (Read-only) */}
+          <div>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">کالاها</p>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {sale.items.map(item => (
+                <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">{item.productName}</p>
+                    <p className="text-xs text-slate-500">تعداد: {item.quantity}</p>
+                  </div>
+                  <p className="text-sm font-bold">{formatCurrency(item.total, settings.currency)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Editable Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">نوع تخفیف</label>
+              <select
+                value={discountType}
+                onChange={e => setDiscountType(e.target.value as 'amount' | 'percent')}
+                className="input"
+              >
+                <option value="amount">مبلغی</option>
+                <option value="percent">درصدی</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">مقدار تخفیف</label>
+              <input
+                type="number"
+                value={discount}
+                onChange={e => setDiscount(Number(e.target.value))}
+                className="input"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">مبلغ پرداختی</label>
+              <input
+                type="number"
+                value={paid}
+                onChange={e => setPaid(Number(e.target.value))}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">روش پرداخت</label>
+              <select
+                value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value as Sale['paymentMethod'])}
+                className="input"
+              >
+                <option value="cash">نقدی</option>
+                <option value="card">کارتخوان</option>
+                <option value="mixed">ترکیبی</option>
+                <option value="credit">نسیه</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">وضعیت</label>
+            <select
+              value={status}
+              onChange={e => setStatus(e.target.value as Sale['status'])}
+              className="input"
+            >
+              <option value="completed">تکمیل شده</option>
+              <option value="returned">مرجوعی</option>
+              <option value="cancelled">لغو شده</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">یادداشت</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="input"
+              rows={3}
+            />
+          </div>
+
+          {/* Summary */}
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-2 border-blue-200 dark:border-blue-800">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>جمع کل:</span>
+                <span className="font-bold">{formatCurrency(sale.subtotal, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between text-red-600">
+                <span>تخفیف:</span>
+                <span>- {formatCurrency(discountType === 'percent' ? Math.round(sale.subtotal * discount / 100) : discount, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between font-bold text-lg border-t border-blue-300 dark:border-blue-700 pt-2">
+                <span>مبلغ نهایی:</span>
+                <span className="text-blue-600">
+                  {formatCurrency(
+                    sale.subtotal - (discountType === 'percent' ? Math.round(sale.subtotal * discount / 100) : discount) + 
+                    Math.round((sale.subtotal - (discountType === 'percent' ? Math.round(sale.subtotal * discount / 100) : discount)) * settings.taxRate / 100),
+                    settings.currency
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button variant="outline" className="flex-1" onClick={onClose}>
+              انصراف
+            </Button>
+            <Button variant="primary" className="flex-1" onClick={handleSave}>
+              ذخیره تغییرات
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
