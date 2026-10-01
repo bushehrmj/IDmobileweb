@@ -108,7 +108,47 @@ export default function RepairForm({ repair, initialSettled = false, onSave, onC
     setForm({ ...form, [field]: value });
   };
 
-  const addPart = () => {
+  const addPartFromStock = () => {
+    const products = db.getProducts().filter(p => p.category === 'قطعات' || p.category === 'لوازم جانبی');
+    const search = prompt('جستجوی قطعه از انبار (نام یا بخش از نام):');
+    if (!search) return;
+    
+    const found = products.filter(p => 
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.brand?.toLowerCase().includes(search.toLowerCase()) ||
+      p.model?.toLowerCase().includes(search.toLowerCase())
+    );
+    
+    if (found.length === 0) {
+      if (confirm('قطعه‌ای یافت نشد. آیا می‌خواهید دستی اضافه کنید؟')) {
+        addPartManual();
+      }
+      return;
+    }
+    
+    const productNames = found.map((p, i) => `${i + 1}. ${p.name} (${p.brand || ''} ${p.model || ''}) - موجودی: ${p.stock}`).join('\n');
+    const choice = prompt(`قطعات یافت شده:\n${productNames}\n\nشماره قطعه مورد نظر را وارد کنید:`);
+    const index = parseInt(choice || '1') - 1;
+    
+    if (index >= 0 && index < found.length) {
+      const product = found[index];
+      const qtyStr = prompt('تعداد:', '1');
+      const qty = parseInt(qtyStr || '1') || 1;
+      
+      const part: RepairPart = {
+        id: uuidv4(),
+        productId: product.id,
+        productName: product.name,
+        quantity: qty,
+        price: product.sellPrice,
+        total: qty * product.sellPrice,
+      };
+      
+      setForm({ ...form, parts: [...(form.parts || []), part] });
+    }
+  };
+
+  const addPartManual = () => {
     const name = prompt('نام قطعه:');
     if (!name) return;
     const qtyStr = prompt('تعداد:', '1');
@@ -156,6 +196,8 @@ export default function RepairForm({ repair, initialSettled = false, onSave, onC
   };
 
   const handleSubmit = () => {
+    console.log('📝 handleSubmit فراخوانی شد');
+    
     if (!form.customerName?.trim()) {
       showToast('error', 'نام مشتری الزامی است');
       return;
@@ -197,7 +239,10 @@ export default function RepairForm({ repair, initialSettled = false, onSave, onC
       remaining: remaining > 0 ? remaining : 0,
     };
 
+    console.log('📝 repairData آماده ارسال:', repairData);
+    console.log('📝 فراخوانی onSave...');
     onSave(repairData);
+    console.log('✅ onSave فراخوانی شد');
   };
 
   const partsCost = (form.parts || []).reduce((sum, p) => sum + p.total, 0);
@@ -448,9 +493,14 @@ export default function RepairForm({ repair, initialSettled = false, onSave, onC
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium">قطعات مصرفی</span>
-                  <button onClick={addPart} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">
-                    + افزودن قطعه
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={addPartFromStock} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">
+                      + از انبار
+                    </button>
+                    <button onClick={addPartManual} className="px-3 py-1 bg-green-600 text-white rounded text-sm">
+                      + دستی
+                    </button>
+                  </div>
                 </div>
                 {(form.parts || []).map(part => (
                   <div key={part.id} className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded">

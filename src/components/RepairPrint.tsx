@@ -10,10 +10,15 @@ interface RepairPrintProps {
 }
 
 export default function RepairPrint({ repairId, type, onClose }: RepairPrintProps) {
+  console.log('🔍 RepairPrint render شد - repairId:', repairId, 'type:', type);
+  
   let repair = db.getRepair(repairId);
   const settings = db.getSettings();
 
+  console.log('🔍 Repair data:', repair);
+
   if (!repair) {
+    console.error('❌ تعمیر یافت نشد برای ID:', repairId);
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-6 text-center">
@@ -23,6 +28,8 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
       </div>
     );
   }
+  
+  console.log('✅ RepairPrint با موفقیت render شد');
 
   // Migration: Add missing fields for old repairs
   if (!repair.accessories) {

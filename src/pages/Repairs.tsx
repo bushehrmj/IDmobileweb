@@ -104,6 +104,7 @@ export default function Repairs() {
     }
 
     // اضافه کردن مشتری به لیست مشتریان
+    console.log('👤 بررسی مشتری:', finalRepairData.customerName, finalRepairData.customerMobile);
     if (finalRepairData.customerName && finalRepairData.customerMobile) {
       const customerNames = finalRepairData.customerName.trim().split(' ');
       const firstName = customerNames[0] || '';
@@ -113,6 +114,8 @@ export default function Repairs() {
       let customer = db.getCustomers().find(c => 
         c.mobile === finalRepairData.customerMobile && finalRepairData.customerMobile !== ''
       );
+      
+      console.log('👤 مشتری موجود:', customer);
       
       if (!customer) {
         // ایجاد مشتری جدید
@@ -130,9 +133,15 @@ export default function Repairs() {
           invoiceCount: 0,
           createdAt: new Date().toISOString(),
         };
+        console.log('👤 ایجاد مشتری جدید:', customer);
         db.saveCustomer(customer);
+        console.log('✅ مشتری ذخیره شد');
         showToast('success', `مشتری ${finalRepairData.customerName} به لیست مشتریان اضافه شد`);
+      } else {
+        console.log('ℹ️ مشتری قبلاً وجود دارد');
       }
+    } else {
+      console.warn('⚠️ نام یا موبایل مشتری خالی است');
     }
 
     // اگر تسویه کامل شده و وضعیت تحویل است، فاکتور فروش ایجاد شود
