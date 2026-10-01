@@ -79,9 +79,20 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
             {settings.showStorePhone && settings.storePhone && <p className="text-xs">تلفن: {settings.storePhone}</p>}
             {settings.showStoreAddress && settings.storeAddress && <p className="text-xs">{settings.storeAddress}</p>}
             <div className="mt-3">
-              <p className="font-bold text-lg">رسید پذیرش تعمیرات</p>
-              <p className="text-sm mt-1">شماره پذیرش: <span className="font-mono font-bold">{repair.ticketNumber}</span></p>
-              <p className="text-xs">تاریخ: {toJalali(repair.entryDate)} | ساعت: {repair.entryTime}</p>
+              {type === 'receipt' ? (
+                <>
+                  <p className="font-bold text-lg">رسید پذیرش تعمیرات</p>
+                  <p className="text-xs text-slate-600 mt-1">این رسید، مستند وضعیت دستگاه در زمان تحویل به مرکز تعمیرات است</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-bold text-lg">فاکتور خدمات تعمیرات</p>
+                  <p className="text-xs text-slate-600 mt-1">صورتحساب نهایی خدمات انجام‌شده</p>
+                </>
+              )}
+              <p className="text-sm mt-2">شماره: <span className="font-mono font-bold">{repair.ticketNumber}</span></p>
+              <p className="text-xs">تاریخ پذیرش: {toJalali(repair.entryDate)} | ساعت: {repair.entryTime}</p>
+              {repair.deliveryDate && <p className="text-xs">تاریخ تحویل: {toJalali(repair.deliveryDate)}</p>}
             </div>
           </div>
 
@@ -211,9 +222,24 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
 
           {/* Footer */}
           <div className="mt-6 pt-3 border-t-2 border-slate-800 text-center text-xs text-slate-600">
-            <p>این رسید، مستند پذیرش و وضعیت ثبت‌شده دستگاه در زمان تحویل به مرکز تعمیرات است.</p>
-            <p className="mt-1">شرایط خدمات و گارانتی مطابق موارد درج‌شده در همین رسید و مقررات جاری خواهد بود.</p>
-            <p className="mt-2 font-mono">شماره پذیرش: {repair.ticketNumber} | تاریخ: {toJalali(repair.entryDate)}</p>
+            {type === 'receipt' ? (
+              <>
+                <p className="font-bold mb-1">رسید پذیرش تعمیرات</p>
+                <p>این رسید، مستند پذیرش و وضعیت ثبت‌شده دستگاه در زمان تحویل به مرکز تعمیرات است.</p>
+                <p className="mt-1">شرایط خدمات و گارانتی مطابق موارد درج‌شده در همین رسید و مقررات جاری خواهد بود.</p>
+                <p className="mt-2">لطفاً این رسید را تا زمان تحویل دستگاه نزد خود نگهداری نمایید.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-bold mb-1">فاکتور خدمات تعمیرات</p>
+                <p>این فاکتور، صورتحساب نهایی خدمات انجام‌شده بر روی دستگاه می‌باشد.</p>
+                <p className="mt-1">در صورت وجود گارانتی، شرایط آن در این فاکتور درج شده است.</p>
+                <p className="mt-2">از اعتماد شما سپاسگزاریم.</p>
+              </>
+            )}
+            <p className="mt-3 font-mono border-t border-slate-300 pt-2">
+              شماره: {repair.ticketNumber} | تاریخ: {toJalali(repair.entryDate)}
+            </p>
           </div>
         </div>
       </div>

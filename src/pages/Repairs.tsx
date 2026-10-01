@@ -45,6 +45,7 @@ export default function Repairs() {
   const [editRepair, setEditRepair] = useState<Repair | null>(null);
   const [printRepairId, setPrintRepairId] = useState<string | null>(null);
   const [printType, setPrintType] = useState<'receipt' | 'invoice'>('receipt');
+  const [settled, setSettled] = useState(false);
 
   useEffect(() => { loadRepairs(); }, []);
   const loadRepairs = () => setRepairs(db.getRepairs().reverse());
@@ -57,12 +58,19 @@ export default function Repairs() {
 
   const openNew = () => {
     setEditRepair(null);
+    setSettled(false);
     setShowForm(true);
   };
 
   const openEdit = (r: Repair) => {
     setEditRepair(r);
     setShowForm(true);
+    // اگر تعمیر تسویه شده است، settled را true کن
+    if (r.remaining === 0 && r.status === 'delivered') {
+      setSettled(true);
+    } else {
+      setSettled(false);
+    }
   };
 
   // ریست settled وقتی فرم باز می‌شود
@@ -264,7 +272,6 @@ export default function Repairs() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log('Edit clicked:', r.id);
                         openEdit(r);
                       }} 
                       className="px-3 py-1.5 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg flex items-center gap-1 transition-colors"
@@ -276,8 +283,6 @@ export default function Repairs() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('Receipt clicked:', r.id);
-                      alert('دکمه رسید کلیک شد - ID: ' + r.id);
                       setPrintRepairId(r.id);
                       setPrintType('receipt');
                     }}
@@ -289,7 +294,6 @@ export default function Repairs() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('Invoice clicked:', r.id);
                       setPrintRepairId(r.id);
                       setPrintType('invoice');
                     }}
@@ -309,8 +313,9 @@ export default function Repairs() {
       {showForm && (
         <RepairForm
           repair={editRepair}
+          initialSettled={settled}
           onSave={handleSave}
-          onCancel={() => { setShowForm(false); setEditRepair(null); }}
+          onCancel={() => { setShowForm(false); setEditRepair(null); setSettled(false); }}
         />
       )}
 

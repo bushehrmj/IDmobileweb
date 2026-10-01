@@ -6,6 +6,7 @@ import { Camera, ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
 
 interface RepairFormProps {
   repair?: Repair | null;
+  initialSettled?: boolean;
   onSave: (repair: Repair) => void;
   onCancel: () => void;
 }
@@ -182,22 +183,24 @@ const defaultWarnings: RepairWarnings = {
   partsAvailabilityWarning: false,
 };
 
-export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps) {
+export default function RepairForm({ repair, initialSettled = false, onSave, onCancel }: RepairFormProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const totalSteps = 11;
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [settled, setSettled] = useState(false);
+  const [settled, setSettled] = useState(initialSettled);
 
   // وقتی repair تغییر می‌کند، settled را تنظیم کن
   useEffect(() => {
-    if (repair && repair.remaining === 0 && repair.status === 'delivered') {
+    if (initialSettled) {
+      setSettled(true);
+    } else if (repair && repair.remaining === 0 && repair.status === 'delivered') {
       setSettled(true);
     } else {
       setSettled(false);
     }
-  }, [repair]);
+  }, [repair, initialSettled]);
 
   const now = new Date();
   const [form, setForm] = useState<Partial<Repair>>(repair || {
@@ -1084,6 +1087,27 @@ export default function RepairForm({ repair, onSave, onCancel }: RepairFormProps
                 onChange={e => updateField('estimatedDeliveryDate', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">وضعیت تعمیر</label>
+              <select
+                value={form.status}
+                onChange={e => updateField('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="received">دریافت شد</option>
+                <option value="waiting_check">در انتظار بررسی</option>
+                <option value="diagnosing">در حال عیب‌یابی</option>
+                <option value="waiting_customer_approval">در انتظار تأیید مشتری</option>
+                <option value="repairing">در حال تعمیر</option>
+                <option value="waiting_part">منتظر قطعه</option>
+                <option value="completed">تکمیل شد</option>
+                <option value="ready_for_delivery">آماده تحویل</option>
+                <option value="delivered">تحویل شد</option>
+                <option value="cancelled">لغو شد</option>
+                <option value="not_repairable">غیرقابل تعمیر</option>
+              </select>
             </div>
             
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
