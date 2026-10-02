@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import GlobalSearch from './GlobalSearch';
 import QuickActions from './QuickActions';
+import NotificationCenter from './NotificationCenter';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -270,10 +271,7 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
                 <Plus size={20} />
               </button>
 
-              <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg relative">
-                <Bell size={20} />
-                <span className="absolute top-1 left-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationCenter />
 
               <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
                 <Moon size={20} className="dark:hidden" />

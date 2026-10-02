@@ -5,6 +5,7 @@ import { initializeFinancialDB } from './lib/financialDb';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Onboarding from './components/Onboarding';
 import { Shield, FileWarning } from 'lucide-react';
 
 // Lazy load pages for code splitting
@@ -50,6 +51,7 @@ function PageLoading() {
 function AppContent() {
   const { isAuthenticated, hasPermission, canViewPage, refreshUser } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Apply theme
   useEffect(() => {
@@ -58,6 +60,21 @@ function AppContent() {
       document.documentElement.classList.add('dark');
     }
   }, []);
+
+  // Check if user has seen onboarding
+  useEffect(() => {
+    if (isAuthenticated) {
+      const hasSeenOnboarding = localStorage.getItem('idmobile_onboarding_completed');
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+      }
+    }
+  }, [isAuthenticated]);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem('idmobile_onboarding_completed', 'true');
+    setShowOnboarding(false);
+  };
 
   // Refresh user data on mount to get latest permissions
   useEffect(() => {
@@ -188,9 +205,14 @@ function AppContent() {
   };
 
   return (
-    <Layout currentPage={currentPage} onNavigate={setCurrentPage}>
-      {renderPage()}
-    </Layout>
+    <>
+      {showOnboarding && (
+        <Onboarding onComplete={handleOnboardingComplete} />
+      )}
+      <Layout currentPage={currentPage} onNavigate={setCurrentPage}>
+        {renderPage()}
+      </Layout>
+    </>
   );
 }
 
