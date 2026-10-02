@@ -1,37 +1,51 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AuthProvider, ToastProvider, useAuth } from './lib/auth';
 import { initializeDB } from './lib/db';
 import { initializeFinancialDB } from './lib/financialDb';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Sales from './pages/Sales';
-import Products from './pages/Products';
-import Customers from './pages/Customers';
-import Repairs from './pages/Repairs';
-import Reports from './pages/Reports';
-import SettingsPage from './pages/Settings';
-import UsersPage from './pages/Users';
-import Purchases from './pages/Purchases';
-import Inventory from './pages/Inventory';
-import BackupPage from './pages/Backup';
-import Payments from './pages/Payments';
-import FinancialDashboard from './pages/FinancialDashboard';
-import CashAndBank from './pages/CashAndBank';
-import ExpensesAndIncome from './pages/ExpensesAndIncome';
-import FinancialReports from './pages/FinancialReports';
-import ChartOfAccounts from './pages/ChartOfAccounts';
-import GeneralLedger from './pages/GeneralLedger';
-import Checks from './pages/Checks';
-import Transfers from './pages/Transfers';
-import CustomerAccounts from './pages/CustomerAccounts';
-import SupplierAccounts from './pages/SupplierAccounts';
-import ComprehensiveFinancialReport from './pages/ComprehensiveFinancialReport';
 import { Shield, FileWarning } from 'lucide-react';
+
+// Lazy load pages for code splitting
+const Sales = lazy(() => import('./pages/Sales'));
+const Products = lazy(() => import('./pages/Products'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Repairs = lazy(() => import('./pages/Repairs'));
+const Reports = lazy(() => import('./pages/Reports'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const UsersPage = lazy(() => import('./pages/Users'));
+const Purchases = lazy(() => import('./pages/Purchases'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const BackupPage = lazy(() => import('./pages/Backup'));
+const Payments = lazy(() => import('./pages/Payments'));
+const FinancialDashboard = lazy(() => import('./pages/FinancialDashboard'));
+const CashAndBank = lazy(() => import('./pages/CashAndBank'));
+const ExpensesAndIncome = lazy(() => import('./pages/ExpensesAndIncome'));
+const FinancialReports = lazy(() => import('./pages/FinancialReports'));
+const ChartOfAccounts = lazy(() => import('./pages/ChartOfAccounts'));
+const GeneralLedger = lazy(() => import('./pages/GeneralLedger'));
+const Checks = lazy(() => import('./pages/Checks'));
+const Transfers = lazy(() => import('./pages/Transfers'));
+const CustomerAccounts = lazy(() => import('./pages/CustomerAccounts'));
+const SupplierAccounts = lazy(() => import('./pages/SupplierAccounts'));
+const ComprehensiveFinancialReport = lazy(() => import('./pages/ComprehensiveFinancialReport'));
 
 // Initialize DB
 initializeDB();
 initializeFinancialDB();
+
+// Loading component
+function PageLoading() {
+  return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-slate-500 dark:text-slate-400">در حال بارگذاری...</p>
+      </div>
+    </div>
+  );
+}
 
 function AppContent() {
   const { isAuthenticated, hasPermission, canViewPage, refreshUser } = useAuth();
@@ -125,30 +139,50 @@ function AppContent() {
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard': return <Dashboard />;
-      case 'sales': return <Sales />;
-      case 'invoices': return <Sales />;
-      case 'proformas': return <Sales />;
-      case 'products': return <Products />;
-      case 'customers': return <Customers />;
-      case 'repairs': return <Repairs />;
-      case 'reports': return <Reports />;
-      case 'settings': return <SettingsPage />;
-      case 'users': return <UsersPage />;
-      case 'purchases': case 'suppliers': return <Purchases />;
-      case 'inventory': return <Inventory />;
-      case 'backup': return <BackupPage />;
-      case 'payments': return <Payments />;
-      case 'financial': return <FinancialDashboard />;
-      case 'cashbank': return <CashAndBank />;
-      case 'expenses': return <ExpensesAndIncome />;
-      case 'financialreports': return <FinancialReports />;
-      case 'chartofaccounts': return <ChartOfAccounts />;
-      case 'generalledger': return <GeneralLedger />;
-      case 'checks': return <Checks />;
-      case 'transfers': return <Transfers />;
-      case 'customeraccounts': return <CustomerAccounts />;
-      case 'supplieraccounts': return <SupplierAccounts />;
-      case 'comprehensivereport': return <ComprehensiveFinancialReport />;
+      case 'sales': case 'invoices': case 'proformas': 
+        return <Suspense fallback={<PageLoading />}><Sales /></Suspense>;
+      case 'products': 
+        return <Suspense fallback={<PageLoading />}><Products /></Suspense>;
+      case 'customers': 
+        return <Suspense fallback={<PageLoading />}><Customers /></Suspense>;
+      case 'repairs': 
+        return <Suspense fallback={<PageLoading />}><Repairs /></Suspense>;
+      case 'reports': 
+        return <Suspense fallback={<PageLoading />}><Reports /></Suspense>;
+      case 'settings': 
+        return <Suspense fallback={<PageLoading />}><SettingsPage /></Suspense>;
+      case 'users': 
+        return <Suspense fallback={<PageLoading />}><UsersPage /></Suspense>;
+      case 'purchases': case 'suppliers': 
+        return <Suspense fallback={<PageLoading />}><Purchases /></Suspense>;
+      case 'inventory': 
+        return <Suspense fallback={<PageLoading />}><Inventory /></Suspense>;
+      case 'backup': 
+        return <Suspense fallback={<PageLoading />}><BackupPage /></Suspense>;
+      case 'payments': 
+        return <Suspense fallback={<PageLoading />}><Payments /></Suspense>;
+      case 'financial': 
+        return <Suspense fallback={<PageLoading />}><FinancialDashboard /></Suspense>;
+      case 'cashbank': 
+        return <Suspense fallback={<PageLoading />}><CashAndBank /></Suspense>;
+      case 'expenses': 
+        return <Suspense fallback={<PageLoading />}><ExpensesAndIncome /></Suspense>;
+      case 'financialreports': 
+        return <Suspense fallback={<PageLoading />}><FinancialReports /></Suspense>;
+      case 'chartofaccounts': 
+        return <Suspense fallback={<PageLoading />}><ChartOfAccounts /></Suspense>;
+      case 'generalledger': 
+        return <Suspense fallback={<PageLoading />}><GeneralLedger /></Suspense>;
+      case 'checks': 
+        return <Suspense fallback={<PageLoading />}><Checks /></Suspense>;
+      case 'transfers': 
+        return <Suspense fallback={<PageLoading />}><Transfers /></Suspense>;
+      case 'customeraccounts': 
+        return <Suspense fallback={<PageLoading />}><CustomerAccounts /></Suspense>;
+      case 'supplieraccounts': 
+        return <Suspense fallback={<PageLoading />}><SupplierAccounts /></Suspense>;
+      case 'comprehensivereport': 
+        return <Suspense fallback={<PageLoading />}><ComprehensiveFinancialReport /></Suspense>;
       default: return <Dashboard />;
     }
   };
