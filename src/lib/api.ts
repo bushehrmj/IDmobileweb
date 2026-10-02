@@ -1,12 +1,16 @@
 /**
  * API Client - Hybrid approach
  * Works with both Backend API and localStorage fallback
+ * 
+ * Currently using localStorage as primary storage.
+ * When backend is ready, set USE_BACKEND = true
  */
 
 import { db } from './db';
 
-const API_BASE = 'http://localhost:3001/api';
-const USE_BACKEND = false; // Toggle between backend and localStorage
+// Use relative path for API - works with both localhost and LAN
+const API_BASE = '/api';
+const USE_BACKEND = false; // Set to true when backend is fully implemented
 
 interface ApiResponse<T> {
   data?: T;

@@ -1,21 +1,16 @@
 /**
- * ID Mobile Manager Pro - Local Server
- * 
- * This is a simple local server for serving the built application.
- * Run this after building the project: npm run build
- * 
- * Usage:
- *   node server.js
- * 
- * Then access:
- *   - On this computer: http://localhost:3000
- *   - From mobile on same WiFi: http://YOUR-IP:3000
+ * ID Mobile Manager Pro - Unified Server
+ * Serves both Frontend and Backend API
  */
 
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 const DIST_DIR = path.join(__dirname, 'dist');
@@ -57,10 +52,17 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
+  
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
     res.end();
+    return;
+  }
+
+  // API routes
+  if (req.url?.startsWith('/api/')) {
+    res.writeHead(501, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'API not yet implemented. Using localStorage.' }));
     return;
   }
 
@@ -109,7 +111,7 @@ server.listen(PORT, '0.0.0.0', () => {
   const ips = getLocalIPs();
   console.log('');
   console.log('╔══════════════════════════════════════════════════════╗');
-  console.log('║        ID Mobile Manager Pro - Local Server         ║');
+  console.log('║        ID Mobile Manager Pro - Server               ║');
   console.log('╠══════════════════════════════════════════════════════╣');
   console.log(`║  Server running on port ${PORT}                        ║`);
   console.log('║                                                      ║');
@@ -122,7 +124,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`║    → ${url}${' '.repeat(Math.max(0, 48 - url.length))}║`);
   });
   console.log('║                                                      ║');
-  console.log('║  Default login: admin / ChangeMe123!                 ║');
+  console.log('║  Default login: admin / admin123                     ║');
   console.log('║  (Change password on first login)                    ║');
   console.log('║                                                      ║');
   console.log('║  Press Ctrl+C to stop the server                     ║');
