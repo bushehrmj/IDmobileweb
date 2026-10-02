@@ -1,24 +1,28 @@
 /**
  * ID Mobile Manager Pro - Backend Server
- * Node.js + Express + SQLite
+ * Node.js + Express + SQLite (ES Module)
  */
 
-const express = require('express');
-const cors = require('cors');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import cors from 'cors';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production-12345';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('dist'));
 
 // Database Setup
 const dbPath = path.join(__dirname, 'data', 'idmobile.db');
@@ -32,9 +36,12 @@ const db = new Database(dbPath);
 
 // Enable WAL mode for better performance
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 // Initialize Database Schema
 function initializeDatabase() {
+  console.log('📦 Initializing database schema...');
+
   // Users table
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -95,6 +102,11 @@ function initializeDatabase() {
     )
   `);
 
+  // Create indexes for better performance
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)`);
+
   // Product Serials table
   db.exec(`
     CREATE TABLE IF NOT EXISTS product_serials (
@@ -110,6 +122,9 @@ function initializeDatabase() {
       FOREIGN KEY (product_id) REFERENCES products(id)
     )
   `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_product_serials_imei1 ON product_serials(imei1)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_product_serials_status ON product_serials(status)`);
 
   // Customers table
   db.exec(`
@@ -129,6 +144,9 @@ function initializeDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_customers_mobile ON customers(mobile)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(first_name, last_name)`);
 
   // Sales table
   db.exec(`
@@ -155,6 +173,10 @@ function initializeDatabase() {
       FOREIGN KEY (customer_id) REFERENCES customers(id)
     )
   `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sales_invoice_number ON sales(invoice_number)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sales_customer_id ON sales(customer_id)`);
 
   // Sale Items table
   db.exec(`
@@ -195,6 +217,8 @@ function initializeDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_purchases_date ON purchases(date)`);
 
   // Purchase Items table
   db.exec(`
@@ -246,6 +270,9 @@ function initializeDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_repairs_ticket_number ON repairs(ticket_number)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_repairs_status ON repairs(status)`);
 
   // Stock Movements table
   db.exec(`
@@ -301,6 +328,8 @@ function initializeDatabase() {
     )
   `);
 
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_date ON audit_logs(date)`);
+
   // Settings table
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -309,18 +338,19 @@ function initializeDatabase() {
     )
   `);
 
+  console.log('✅ Database schema initialized');
+
   // Create default admin user
   const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   
   if (!adminExists) {
-    const bcrypt = require('bcrypt');
     const passwordHash = bcrypt.hashSync('admin123', 10);
     
     db.prepare(`
       INSERT INTO users (id, username, password_hash, full_name, role, permissions, visible_pages, active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      'admin-001',
+      uuidv4(),
       'admin',
       passwordHash,
       'مدیر سیستم',
@@ -374,6 +404,11 @@ function checkPermission(permission) {
 // API Routes
 // ============================================
 
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Auth Routes
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -407,7 +442,7 @@ app.post('/api/auth/login', async (req, res) => {
       .run(new Date().toISOString(), user.id);
 
     // Create session
-    const sessionId = require('uuid').v4();
+    const sessionId = uuidv4();
     db.prepare(`
       INSERT INTO sessions (id, user_id, username, role, login_time, last_activity, device, ip, active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -435,6 +470,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
   }
 });
@@ -495,7 +531,6 @@ app.get('/api/products/:id', authenticateToken, (req, res) => {
 
 app.post('/api/products', authenticateToken, checkPermission('products.create'), (req, res) => {
   try {
-    const { v4: uuidv4 } = require('uuid');
     const id = uuidv4();
     const now = new Date().toISOString();
     
@@ -529,6 +564,7 @@ app.post('/api/products', authenticateToken, checkPermission('products.create'),
 
     res.json({ id, message: 'Product created successfully' });
   } catch (error) {
+    console.error('Create product error:', error);
     res.status(500).json({ error: 'Failed to create product' });
   }
 });
@@ -545,7 +581,6 @@ app.get('/api/customers', authenticateToken, (req, res) => {
 
 app.post('/api/customers', authenticateToken, checkPermission('customers.create'), (req, res) => {
   try {
-    const { v4: uuidv4 } = require('uuid');
     const id = uuidv4();
     
     db.prepare(`
@@ -584,13 +619,8 @@ app.get('/api/sales', authenticateToken, (req, res) => {
   }
 });
 
-// Serve React App
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
-
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`
 ╔══════════════════════════════════════════════════════╗
 ║        ID Mobile Manager Pro - Backend Server       ║
@@ -598,7 +628,6 @@ app.listen(PORT, () => {
 ║  Server running on port ${PORT}                        ║
 ║                                                      ║
 ║  API Endpoint: http://localhost:${PORT}/api             ║
-║  Frontend: http://localhost:${PORT}                     ║
 ║                                                      ║
 ║  Database: ${dbPath}
 ║                                                      ║

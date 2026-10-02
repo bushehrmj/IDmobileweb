@@ -10,7 +10,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (username: string, password: string) => { success: boolean; message: string };
+  login: (username: string, password: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   changePassword: (oldPass: string, newPass: string) => { success: boolean; message: string };
   hasPermission: (permission: string) => boolean;
@@ -91,7 +91,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = useCallback((username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string) => {
+    // Try Backend API first
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Store token
+        sessionStorage.setItem('idmobile_token', data.token);
+        
+        const session: Session = {
+          id: uuidv4(),
+          userId: data.user.id,
+          username: data.user.username,
+          role: data.user.role,
+          loginTime: new Date().toISOString(),
+          lastActivity: new Date().toISOString(),
+          device: navigator.userAgent,
+          ip: '127.0.0.1',
+          active: true,
+        };
+        
+        sessionStorage.setItem('idmobile_session', session.id);
+        
+        const settings = db.getSettings();
+        setupTimeout(settings.sessionTimeout);
+        
+        const mustChange = data.user.username === 'admin' && password === 'admin123';
+        
+        setAuthState({
+          user: {
+            id: data.user.id,
+            username: data.user.username,
+            passwordHash: '', // Not needed when using backend
+            fullName: data.user.fullName,
+            role: data.user.role,
+            permissions: data.user.permissions,
+            visiblePages: data.user.visiblePages,
+            active: true,
+            createdAt: new Date().toISOString(),
+          },
+          session,
+          isAuthenticated: true,
+          mustChangePassword: mustChange,
+        });
+        
+        return { success: true, message: 'ورود موفق' };
+      }
+    } catch (error) {
+      // Backend not available, fallback to localStorage
+      console.log('Backend not available, using localStorage fallback');
+    }
+
+    // Fallback to localStorage authentication
     // Check lock
     const attempt = db.getLoginAttempt(username);
     if (attempt && attempt.locked) {

@@ -7,7 +7,7 @@ echo ╔════════════════════════
 echo ║        ID Mobile Manager Pro - Start Script         ║
 echo ╠══════════════════════════════════════════════════════╣
 echo ║                                                      ║
-echo ║  Starting server...                                  ║
+echo ║  Starting unified server (Frontend + Backend)...    ║
 echo ║                                                      ║
 echo ╚══════════════════════════════════════════════════════╝
 echo.
@@ -43,8 +43,14 @@ if not exist "dist" (
     )
 )
 
-REM Start server
-echo [INFO] Starting server on port 3000...
+REM Create data directory if not exists
+if not exist "data" (
+    echo [INFO] Creating data directory...
+    mkdir data
+)
+
+REM Start unified server
+echo [INFO] Starting unified server on port 3000...
 echo.
 echo ╔══════════════════════════════════════════════════════╗
 echo ║  Server is running!                                  ║
@@ -52,9 +58,14 @@ echo ║                                                      ║
 echo ║  Open in browser:                                    ║
 echo ║    http://localhost:3000                             ║
 echo ║                                                      ║
+echo ║  API Endpoint:                                       ║
+echo ║    http://localhost:3000/api                         ║
+echo ║                                                      ║
 echo ║  Default login:                                      ║
 echo ║    Username: admin                                   ║
 echo ║    Password: admin123                                ║
+echo ║                                                      ║
+echo ║  Database: SQLite (data/idmobile.db)                ║
 echo ║                                                      ║
 echo ║  Press Ctrl+C to stop the server                    ║
 echo ╚══════════════════════════════════════════════════════╝
