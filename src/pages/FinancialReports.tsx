@@ -3,24 +3,28 @@ import { useAuth, formatCurrency, toJalali } from '../lib/auth';
 import { financialDb } from '../lib/financialDb';
 import { AccountingService } from '../lib/accounting';
 import { db } from '../lib/db';
-import { FileText, Download, Printer } from 'lucide-react';
+import Button from '../components/ui/Button';
+import { 
+  FileText, Download, Printer, TrendingUp, TrendingDown, 
+  DollarSign, PieChart, BarChart3, Activity
+} from 'lucide-react';
 
 export default function FinancialReports() {
   const { hasPermission } = useAuth();
-  const [reportType, setReportType] = useState<'pnl' | 'balance' | 'trial' | 'cashflow'>('pnl');
   const settings = db.getSettings();
+  const [reportType, setReportType] = useState<'pnl' | 'balance' | 'trial' | 'cashflow'>('pnl');
 
   const reports = [
-    { id: 'pnl', label: 'سود و زیان', show: hasPermission('financial.profit') },
-    { id: 'balance', label: 'ترازنامه', show: hasPermission('financial.balance_sheet') },
-    { id: 'trial', label: 'تراز آزمایشی', show: hasPermission('financial.reports') },
-    { id: 'cashflow', label: 'جریان نقدی', show: hasPermission('financial.reports') },
-  ].filter(r => r.show);
+    { id: 'pnl', label: 'سود و زیان', icon: TrendingUp, color: 'bg-green-500' },
+    { id: 'balance', label: 'ترازنامه', icon: Activity, color: 'bg-blue-500' },
+    { id: 'trial', label: 'تراز آزمایشی', icon: BarChart3, color: 'bg-purple-500' },
+    { id: 'cashflow', label: 'جریان نقدی', icon: DollarSign, color: 'bg-amber-500' },
+  ].filter(r => hasPermission('financial.reports'));
 
   const exportCSV = () => {
     // Implementation for CSV export
     const data = getReportData();
-    const csv = data.map(row => Object.values(row).join(',')).join('\n');
+    const csv = data.map((row: any) => Object.values(row).join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -70,19 +74,34 @@ export default function FinancialReports() {
     const netMargin = totalIncome > 0 ? (netProfit / totalIncome * 100) : 0;
 
     return (
-      <div className="space-y-4">
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-bold mb-4">گزارش سود و زیان</h3>
+      <div className="space-y-6">
+        <div className="card p-6">
+          <h3 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">گزارش سود و زیان</h3>
           
           {/* Income */}
-          <div className="mb-6">
-            <h4 className="font-bold text-green-600 mb-2">درآمدها</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between"><span>فروش کالا</span><span>{formatCurrency(sales, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>درآمد تعمیرات</span><span>{formatCurrency(repairIncome, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>درآمد خدمات</span><span>{formatCurrency(serviceIncome, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>سایر درآمدها</span><span>{formatCurrency(otherIncome, settings.currency)}</span></div>
-              <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+          <div className="mb-8">
+            <h4 className="font-bold text-green-600 mb-3 text-lg flex items-center gap-2">
+              <TrendingUp size={20} />
+              درآمدها
+            </h4>
+            <div className="space-y-2">
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">فروش کالا</span>
+                <span className="font-bold">{formatCurrency(sales, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">درآمد تعمیرات</span>
+                <span className="font-bold">{formatCurrency(repairIncome, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">درآمد خدمات</span>
+                <span className="font-bold">{formatCurrency(serviceIncome, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">سایر درآمدها</span>
+                <span className="font-bold">{formatCurrency(otherIncome, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg font-bold border-2 border-green-200 dark:border-green-800">
                 <span>جمع درآمدها</span>
                 <span className="text-green-600">{formatCurrency(totalIncome, settings.currency)}</span>
               </div>
@@ -90,31 +109,58 @@ export default function FinancialReports() {
           </div>
 
           {/* COGS */}
-          <div className="mb-6">
-            <div className="flex justify-between text-sm">
-              <span>بهای تمام‌شده کالا</span>
-              <span className="text-red-600">({formatCurrency(cogs, settings.currency)})</span>
+          <div className="mb-8">
+            <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+              <span className="text-sm">بهای تمام‌شده کالا</span>
+              <span className="font-bold text-red-600">({formatCurrency(cogs, settings.currency)})</span>
             </div>
-            <div className="flex justify-between font-bold text-lg border-t-2 border-slate-300 dark:border-slate-600 pt-2 mt-2">
+            <div className="flex justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg font-bold text-lg border-2 border-blue-200 dark:border-blue-800 mt-3">
               <span>سود ناخالص</span>
               <span className="text-green-600">{formatCurrency(grossProfit, settings.currency)}</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">حاشیه سود ناخالص: {grossMargin.toFixed(1)}%</p>
+            <p className="text-xs text-slate-500 mt-2 text-center">حاشیه سود ناخالص: {grossMargin.toFixed(1)}%</p>
           </div>
 
           {/* Operating Expenses */}
-          <div className="mb-6">
-            <h4 className="font-bold text-red-600 mb-2">هزینه‌های عملیاتی</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between"><span>اجاره</span><span>{formatCurrency(rent, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>حقوق</span><span>{formatCurrency(salary, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>آب، برق، گاز، اینترنت و تلفن</span><span>{formatCurrency(utilities, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>تبلیغات</span><span>{formatCurrency(advertising, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>حمل‌ونقل</span><span>{formatCurrency(transport, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>تعمیر و نگهداری</span><span>{formatCurrency(maintenance, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>کارمزد بانکی</span><span>{formatCurrency(bankFees, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>سایر هزینه‌ها</span><span>{formatCurrency(otherExpenses, settings.currency)}</span></div>
-              <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+          <div className="mb-8">
+            <h4 className="font-bold text-red-600 mb-3 text-lg flex items-center gap-2">
+              <TrendingDown size={20} />
+              هزینه‌های عملیاتی
+            </h4>
+            <div className="space-y-2">
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">اجاره</span>
+                <span className="font-bold">{formatCurrency(rent, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">حقوق</span>
+                <span className="font-bold">{formatCurrency(salary, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">آب، برق، گاز، اینترنت و تلفن</span>
+                <span className="font-bold">{formatCurrency(utilities, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">تبلیغات</span>
+                <span className="font-bold">{formatCurrency(advertising, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">حمل‌ونقل</span>
+                <span className="font-bold">{formatCurrency(transport, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">تعمیر و نگهداری</span>
+                <span className="font-bold">{formatCurrency(maintenance, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">کارمزد بانکی</span>
+                <span className="font-bold">{formatCurrency(bankFees, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">سایر هزینه‌ها</span>
+                <span className="font-bold">{formatCurrency(otherExpenses, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg font-bold border-2 border-red-200 dark:border-red-800">
                 <span>جمع هزینه‌ها</span>
                 <span className="text-red-600">{formatCurrency(totalExpenses, settings.currency)}</span>
               </div>
@@ -122,14 +168,25 @@ export default function FinancialReports() {
           </div>
 
           {/* Net Profit */}
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4">
-            <div className="flex justify-between font-bold text-xl">
-              <span>سود خالص</span>
-              <span className={netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                {formatCurrency(netProfit, settings.currency)}
-              </span>
+          <div className={`p-6 rounded-2xl ${
+            netProfit >= 0 
+              ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-800' 
+              : 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-2 border-red-200 dark:border-red-800'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">سود خالص</p>
+                <p className={`text-3xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(netProfit, settings.currency)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">حاشیه سود خالص</p>
+                <p className={`text-2xl font-bold ${netMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {netMargin.toFixed(1)}%
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">حاشیه سود خالص: {netMargin.toFixed(1)}%</p>
           </div>
         </div>
       </div>
@@ -148,21 +205,24 @@ export default function FinancialReports() {
     const netProfit = AccountingService.getNetProfit();
 
     return (
-      <div className="space-y-4">
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-bold mb-4">ترازنامه</h3>
+      <div className="space-y-6">
+        <div className="card p-6">
+          <h3 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">ترازنامه</h3>
 
           {/* Assets */}
-          <div className="mb-6">
-            <h4 className="font-bold text-blue-600 mb-2">دارایی‌ها</h4>
-            <div className="space-y-1 text-sm">
+          <div className="mb-8">
+            <h4 className="font-bold text-blue-600 mb-3 text-lg flex items-center gap-2">
+              <TrendingUp size={20} />
+              دارایی‌ها
+            </h4>
+            <div className="space-y-2">
               {assets.filter(a => a.balance !== 0).map(a => (
-                <div key={a.id} className="flex justify-between">
-                  <span>{a.name}</span>
-                  <span>{formatCurrency(a.balance, settings.currency)}</span>
+                <div key={a.id} className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                  <span className="text-sm">{a.name}</span>
+                  <span className="font-bold">{formatCurrency(a.balance, settings.currency)}</span>
                 </div>
               ))}
-              <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+              <div className="flex justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg font-bold border-2 border-blue-200 dark:border-blue-800">
                 <span>جمع دارایی‌ها</span>
                 <span className="text-blue-600">{formatCurrency(totalAssets, settings.currency)}</span>
               </div>
@@ -170,16 +230,19 @@ export default function FinancialReports() {
           </div>
 
           {/* Liabilities */}
-          <div className="mb-6">
-            <h4 className="font-bold text-red-600 mb-2">بدهی‌ها</h4>
-            <div className="space-y-1 text-sm">
+          <div className="mb-8">
+            <h4 className="font-bold text-red-600 mb-3 text-lg flex items-center gap-2">
+              <TrendingDown size={20} />
+              بدهی‌ها
+            </h4>
+            <div className="space-y-2">
               {liabilities.filter(a => a.balance !== 0).map(a => (
-                <div key={a.id} className="flex justify-between">
-                  <span>{a.name}</span>
-                  <span>{formatCurrency(a.balance, settings.currency)}</span>
+                <div key={a.id} className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                  <span className="text-sm">{a.name}</span>
+                  <span className="font-bold">{formatCurrency(a.balance, settings.currency)}</span>
                 </div>
               ))}
-              <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+              <div className="flex justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg font-bold border-2 border-red-200 dark:border-red-800">
                 <span>جمع بدهی‌ها</span>
                 <span className="text-red-600">{formatCurrency(totalLiabilities, settings.currency)}</span>
               </div>
@@ -187,20 +250,23 @@ export default function FinancialReports() {
           </div>
 
           {/* Equity */}
-          <div className="mb-6">
-            <h4 className="font-bold text-purple-600 mb-2">حقوق مالکانه</h4>
-            <div className="space-y-1 text-sm">
+          <div className="mb-8">
+            <h4 className="font-bold text-purple-600 mb-3 text-lg flex items-center gap-2">
+              <DollarSign size={20} />
+              حقوق مالکانه
+            </h4>
+            <div className="space-y-2">
               {equity.filter(a => a.balance !== 0).map(a => (
-                <div key={a.id} className="flex justify-between">
-                  <span>{a.name}</span>
-                  <span>{formatCurrency(a.balance, settings.currency)}</span>
+                <div key={a.id} className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                  <span className="text-sm">{a.name}</span>
+                  <span className="font-bold">{formatCurrency(a.balance, settings.currency)}</span>
                 </div>
               ))}
-              <div className="flex justify-between">
-                <span>سود جاری</span>
-                <span>{formatCurrency(netProfit, settings.currency)}</span>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">سود جاری</span>
+                <span className="font-bold">{formatCurrency(netProfit, settings.currency)}</span>
               </div>
-              <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+              <div className="flex justify-between p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg font-bold border-2 border-purple-200 dark:border-purple-800">
                 <span>جمع حقوق مالکانه</span>
                 <span className="text-purple-600">{formatCurrency(totalEquity + netProfit, settings.currency)}</span>
               </div>
@@ -208,17 +274,23 @@ export default function FinancialReports() {
           </div>
 
           {/* Total */}
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4">
-            <div className="flex justify-between font-bold text-lg">
-              <span>جمع بدهی‌ها و حقوق مالکانه</span>
-              <span>{formatCurrency(totalLiabilities + totalEquity + netProfit, settings.currency)}</span>
-            </div>
-            <div className="mt-2 text-center">
-              {AccountingService.verifyAccountingEquation() ? (
-                <span className="text-sm text-green-600">✓ ترازنامه متوازن است</span>
-              ) : (
-                <span className="text-sm text-red-600">✗ مغایرت در ترازنامه</span>
-              )}
+          <div className={`p-6 rounded-2xl ${
+            AccountingService.verifyAccountingEquation()
+              ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-800'
+              : 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-2 border-red-200 dark:border-red-800'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">جمع بدهی‌ها و حقوق مالکانه</p>
+                <p className="text-2xl font-bold">{formatCurrency(totalLiabilities + totalEquity + netProfit, settings.currency)}</p>
+              </div>
+              <div className="text-right">
+                {AccountingService.verifyAccountingEquation() ? (
+                  <span className="text-sm text-green-600 font-medium">✓ ترازنامه متوازن است</span>
+                ) : (
+                  <span className="text-sm text-red-600 font-medium">✗ مغایرت در ترازنامه</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -233,50 +305,64 @@ export default function FinancialReports() {
     const totalCredit = accounts.filter(a => a.type === 'liability' || a.type === 'equity' || a.type === 'income').reduce((sum, a) => sum + Math.abs(a.balance), 0);
 
     return (
-      <div className="space-y-4">
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-bold mb-4">تراز آزمایشی</h3>
+      <div className="space-y-6">
+        <div className="card p-6">
+          <h3 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">تراز آزمایشی</h3>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-700">
+            <table className="table">
+              <thead>
                 <tr>
-                  <th className="px-3 py-2 text-right">کد</th>
-                  <th className="px-3 py-2 text-right">حساب</th>
-                  <th className="px-3 py-2 text-left">بدهکار</th>
-                  <th className="px-3 py-2 text-left">بستانکار</th>
+                  <th>کد</th>
+                  <th>حساب</th>
+                  <th className="text-left">بدهکار</th>
+                  <th className="text-left">بستانکار</th>
                 </tr>
               </thead>
               <tbody>
                 {accounts.map(account => {
                   const isDebit = account.type === 'asset' || account.type === 'expense';
                   return (
-                    <tr key={account.id} className="border-t border-slate-100 dark:border-slate-700">
-                      <td className="px-3 py-2 text-xs">{account.code}</td>
-                      <td className="px-3 py-2">{account.name}</td>
-                      <td className="px-3 py-2 text-left">
-                        {isDebit && account.balance > 0 ? formatCurrency(account.balance, settings.currency) : '-'}
+                    <tr key={account.id}>
+                      <td className="text-xs font-mono">{account.code}</td>
+                      <td className="text-sm">{account.name}</td>
+                      <td className="text-left">
+                        {isDebit && account.balance > 0 ? (
+                          <span className="text-blue-600 font-bold">{formatCurrency(account.balance, settings.currency)}</span>
+                        ) : '-'}
                       </td>
-                      <td className="px-3 py-2 text-left">
-                        {!isDebit && account.balance > 0 ? formatCurrency(account.balance, settings.currency) : '-'}
+                      <td className="text-left">
+                        {!isDebit && account.balance > 0 ? (
+                          <span className="text-green-600 font-bold">{formatCurrency(account.balance, settings.currency)}</span>
+                        ) : '-'}
                       </td>
                     </tr>
                   );
                 })}
-                <tr className="border-t-2 border-slate-300 dark:border-slate-600 font-bold">
-                  <td className="px-3 py-2" colSpan={2}>جمع</td>
-                  <td className="px-3 py-2 text-left">{formatCurrency(totalDebit, settings.currency)}</td>
-                  <td className="px-3 py-2 text-left">{formatCurrency(totalCredit, settings.currency)}</td>
-                </tr>
               </tbody>
+              <tfoot>
+                <tr className="bg-slate-50 dark:bg-slate-700 font-bold">
+                  <td colSpan={2} className="px-3 py-3 text-sm">جمع</td>
+                  <td className="px-3 py-3 text-left text-sm text-blue-600">{formatCurrency(totalDebit, settings.currency)}</td>
+                  <td className="px-3 py-3 text-left text-sm text-green-600">{formatCurrency(totalCredit, settings.currency)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 
-          <div className="mt-4 text-center">
+          <div className="mt-6 text-center">
             {Math.abs(totalDebit - totalCredit) < 1 ? (
-              <span className="text-sm text-green-600">✓ تراز آزمایشی متوازن است</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
+                <CheckCircle size={16} />
+                <span className="text-sm font-medium">تراز آزمایشی متوازن است</span>
+              </div>
             ) : (
-              <span className="text-sm text-red-600">✗ مغایرت: {formatCurrency(Math.abs(totalDebit - totalCredit), settings.currency)}</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">
+                <XCircle size={16} />
+                <span className="text-sm font-medium">
+                  مغایرت: {formatCurrency(Math.abs(totalDebit - totalCredit), settings.currency)}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -296,43 +382,74 @@ export default function FinancialReports() {
     const incomes = financialDb.getIncomeTransactions();
     const totalIncomes = incomes.reduce((sum, i) => sum + i.amount, 0);
 
-    const netCashFlow = cashSales + totalIncomes - totalExpenses;
+    const netCashFlow = cashSales + cardSales + totalIncomes - totalExpenses;
 
     return (
-      <div className="space-y-4">
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-bold mb-4">گزارش جریان نقدی</h3>
+      <div className="space-y-6">
+        <div className="card p-6">
+          <h3 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">گزارش جریان نقدی</h3>
 
-          <div className="mb-6">
-            <h4 className="font-bold text-green-600 mb-2">ورودی‌های نقدی</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between"><span>فروش نقدی</span><span>{formatCurrency(cashSales, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>فروش کارتخوان</span><span>{formatCurrency(cardSales, settings.currency)}</span></div>
-              <div className="flex justify-between"><span>سایر درآمدها</span><span>{formatCurrency(totalIncomes, settings.currency)}</span></div>
-              <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+          <div className="mb-8">
+            <h4 className="font-bold text-green-600 mb-3 text-lg flex items-center gap-2">
+              <TrendingUp size={20} />
+              ورودی‌های نقدی
+            </h4>
+            <div className="space-y-2">
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">فروش نقدی</span>
+                <span className="font-bold">{formatCurrency(cashSales, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">فروش کارتخوان</span>
+                <span className="font-bold">{formatCurrency(cardSales, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">سایر درآمدها</span>
+                <span className="font-bold">{formatCurrency(totalIncomes, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg font-bold border-2 border-green-200 dark:border-green-800">
                 <span>جمع ورودی‌ها</span>
                 <span className="text-green-600">{formatCurrency(cashSales + cardSales + totalIncomes, settings.currency)}</span>
               </div>
             </div>
           </div>
 
-          <div className="mb-6">
-            <h4 className="font-bold text-red-600 mb-2">خروجی‌های نقدی</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between"><span>هزینه‌ها</span><span>{formatCurrency(totalExpenses, settings.currency)}</span></div>
-              <div className="flex justify-between font-bold border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+          <div className="mb-8">
+            <h4 className="font-bold text-red-600 mb-3 text-lg flex items-center gap-2">
+              <TrendingDown size={20} />
+              خروجی‌های نقدی
+            </h4>
+            <div className="space-y-2">
+              <div className="flex justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <span className="text-sm">هزینه‌ها</span>
+                <span className="font-bold">{formatCurrency(totalExpenses, settings.currency)}</span>
+              </div>
+              <div className="flex justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg font-bold border-2 border-red-200 dark:border-red-800">
                 <span>جمع خروجی‌ها</span>
                 <span className="text-red-600">{formatCurrency(totalExpenses, settings.currency)}</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4">
-            <div className="flex justify-between font-bold text-xl">
-              <span>جریان نقدی خالص</span>
-              <span className={netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>
-                {formatCurrency(netCashFlow, settings.currency)}
-              </span>
+          <div className={`p-6 rounded-2xl ${
+            netCashFlow >= 0 
+              ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-800' 
+              : 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-2 border-red-200 dark:border-red-800'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">جریان نقدی خالص</p>
+                <p className={`text-3xl font-bold ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(netCashFlow, settings.currency)}
+                </p>
+              </div>
+              <div className="text-right">
+                {netCashFlow >= 0 ? (
+                  <span className="text-sm text-green-600 font-medium">✓ جریان نقدی مثبت</span>
+                ) : (
+                  <span className="text-sm text-red-600 font-medium">✗ جریان نقدی منفی</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -341,32 +458,69 @@ export default function FinancialReports() {
   };
 
   return (
-    <div className="space-y-4 pb-20 lg:pb-0">
+    <div className="space-y-6 pb-20 lg:pb-0 animate-fadeIn">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">گزارش‌های مالی</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">گزارش‌های مالی</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">گزارش‌های جامع مالی و حسابداری</p>
+        </div>
         <div className="flex gap-2">
-          <button onClick={exportCSV} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm flex items-center gap-1">
-            <Download size={14} /> اکسل
-          </button>
-          <button onClick={() => window.print()} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
-            <Printer size={14} /> چاپ
-          </button>
+          <Button variant="outline" onClick={exportCSV}>
+            <Download size={18} />
+            اکسل
+          </Button>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer size={18} />
+            چاپ
+          </Button>
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      {/* Report Type Selection */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {reports.map(r => (
-          <button key={r.id} onClick={() => setReportType(r.id as any)}
-            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 ${reportType === r.id ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`}>
-            <FileText size={14} /> {r.label}
+          <button
+            key={r.id}
+            onClick={() => setReportType(r.id as any)}
+            className={`card p-4 transition-all ${
+              reportType === r.id
+                ? 'ring-2 ring-blue-500 shadow-lg'
+                : 'hover:shadow-md'
+            }`}
+          >
+            <div className={`w-10 h-10 ${r.color} rounded-xl flex items-center justify-center mb-2`}>
+              <r.icon size={20} className="text-white" />
+            </div>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">{r.label}</p>
           </button>
         ))}
       </div>
 
+      {/* Report Content */}
       {reportType === 'pnl' && renderPnL()}
       {reportType === 'balance' && renderBalanceSheet()}
       {reportType === 'trial' && renderTrialBalance()}
       {reportType === 'cashflow' && renderCashFlow()}
     </div>
+  );
+}
+
+function CheckCircle({ size, className }: { size: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>
+  );
+}
+
+function XCircle({ size, className }: { size: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="15" y1="9" x2="9" y2="15"></line>
+      <line x1="9" y1="9" x2="15" y2="15"></line>
+    </svg>
   );
 }

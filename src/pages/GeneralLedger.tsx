@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, formatCurrency, toJalaliFull } from '../lib/auth';
 import { financialDb, type JournalEntry } from '../lib/financialDb';
 import { db } from '../lib/db';
-import { BookOpen, Download, Printer, Search } from 'lucide-react';
+import Button from '../components/ui/Button';
+import { BookOpen, Download, Printer, Search, Filter, CheckCircle, XCircle } from 'lucide-react';
 
 export default function GeneralLedger() {
   const { hasPermission } = useAuth();
@@ -62,110 +63,152 @@ export default function GeneralLedger() {
   };
 
   return (
-    <div className="space-y-4 pb-20 lg:pb-0">
+    <div className="space-y-6 pb-20 lg:pb-0 animate-fadeIn">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          <BookOpen size={20} className="text-blue-500" />
-          دفتر کل
-        </h2>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <BookOpen size={28} className="text-blue-500" />
+            دفتر کل
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">ثبت‌های حسابداری و اسناد مالی</p>
+        </div>
         <div className="flex gap-2">
-          <button onClick={exportCSV} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm flex items-center gap-1">
-            <Download size={14} /> اکسل
-          </button>
-          <button onClick={() => window.print()} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
-            <Printer size={14} /> چاپ
-          </button>
+          <Button variant="outline" onClick={exportCSV}>
+            <Download size={18} />
+            اکسل
+          </Button>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer size={18} />
+            چاپ
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card p-5 text-center">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">تعداد اسناد</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-white">{filtered.length}</p>
+        </div>
+        <div className="card p-5 text-center">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">جمع بدهکار</p>
+          <p className="text-lg font-bold text-blue-600">{formatCurrency(totalDebit, settings.currency)}</p>
+        </div>
+        <div className="card p-5 text-center">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">جمع بستانکار</p>
+          <p className="text-lg font-bold text-green-600">{formatCurrency(totalCredit, settings.currency)}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[150px]">
-          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="جستجو شرح یا شماره سند..."
-            className="w-full pr-9 pl-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter size={20} className="text-slate-500" />
+          <h3 className="font-bold text-slate-900 dark:text-white">فیلتر و جستجو</h3>
         </div>
-        <select value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}
-          className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800">
-          <option value="all">همه حساب‌ها</option>
-          {accounts.map(a => <option key={a.id} value={a.code}>{a.code} - {a.name}</option>)}
-        </select>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="relative md:col-span-2">
+            <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              value={search} 
+              onChange={e => setSearch(e.target.value)}
+              placeholder="جستجو شرح یا شماره سند..." 
+              className="input pr-12" 
+            />
+          </div>
+          <select 
+            value={selectedAccount} 
+            onChange={e => setSelectedAccount(e.target.value)}
+            className="input"
+          >
+            <option value="all">همه حساب‌ها</option>
+            {accounts.map(a => <option key={a.id} value={a.code}>{a.code} - {a.name}</option>)}
+          </select>
+          <input 
+            type="date" 
+            value={dateFrom} 
+            onChange={e => setDateFrom(e.target.value)}
+            className="input" 
+          />
+        </div>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700 text-center">
-          <p className="text-xs text-slate-500">تعداد اسناد</p>
-          <p className="text-lg font-bold">{filtered.length}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700 text-center">
-          <p className="text-xs text-slate-500">جمع بدهکار</p>
-          <p className="text-sm font-bold text-blue-600">{formatCurrency(totalDebit, settings.currency)}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700 text-center">
-          <p className="text-xs text-slate-500">جمع بستانکار</p>
-          <p className="text-sm font-bold text-green-600">{formatCurrency(totalCredit, settings.currency)}</p>
-        </div>
-      </div>
-
-      {/* Entries */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      {/* Entries Table */}
+      <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-700">
+          <table className="table">
+            <thead>
               <tr>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">تاریخ</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">شماره سند</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">شرح</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">کد</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-500">حساب</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">بدهکار</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-500">بستانکار</th>
+                <th>تاریخ</th>
+                <th>شماره سند</th>
+                <th>شرح</th>
+                <th>کد</th>
+                <th>حساب</th>
+                <th className="text-left">بدهکار</th>
+                <th className="text-left">بستانکار</th>
               </tr>
             </thead>
             <tbody>
               {filtered.slice(0, 100).map(entry => (
                 entry.lines.map((line, idx) => (
-                  <tr key={`${entry.id}-${idx}`} className="border-t border-slate-100 dark:border-slate-700">
-                    <td className="px-3 py-2 text-xs">{toJalaliFull(entry.date)}</td>
-                    <td className="px-3 py-2 text-xs font-mono">{entry.entryNumber}</td>
-                    <td className="px-3 py-2 text-xs">{entry.description}</td>
-                    <td className="px-3 py-2 text-xs font-mono">{line.accountCode}</td>
-                    <td className="px-3 py-2 text-xs">{line.accountName}</td>
-                    <td className="px-3 py-2 text-left text-xs">
-                      {line.debit > 0 ? <span className="text-blue-600 font-bold">{formatCurrency(line.debit, settings.currency)}</span> : '-'}
+                  <tr key={`${entry.id}-${idx}`}>
+                    <td className="text-xs">{toJalaliFull(entry.date)}</td>
+                    <td className="text-xs font-mono">{entry.entryNumber}</td>
+                    <td className="text-xs">{entry.description}</td>
+                    <td className="text-xs font-mono">{line.accountCode}</td>
+                    <td className="text-xs">{line.accountName}</td>
+                    <td className="text-left text-xs">
+                      {line.debit > 0 ? (
+                        <span className="text-blue-600 font-bold">{formatCurrency(line.debit, settings.currency)}</span>
+                      ) : '-'}
                     </td>
-                    <td className="px-3 py-2 text-left text-xs">
-                      {line.credit > 0 ? <span className="text-green-600 font-bold">{formatCurrency(line.credit, settings.currency)}</span> : '-'}
+                    <td className="text-left text-xs">
+                      {line.credit > 0 ? (
+                        <span className="text-green-600 font-bold">{formatCurrency(line.credit, settings.currency)}</span>
+                      ) : '-'}
                     </td>
                   </tr>
                 ))
               ))}
             </tbody>
-            <tfoot className="bg-slate-50 dark:bg-slate-700 font-bold">
-              <tr>
-                <td colSpan={5} className="px-3 py-2 text-sm">جمع</td>
-                <td className="px-3 py-2 text-left text-sm text-blue-600">{formatCurrency(totalDebit, settings.currency)}</td>
-                <td className="px-3 py-2 text-left text-sm text-green-600">{formatCurrency(totalCredit, settings.currency)}</td>
+            <tfoot>
+              <tr className="bg-slate-50 dark:bg-slate-700 font-bold">
+                <td colSpan={5} className="px-3 py-3 text-sm">جمع</td>
+                <td className="px-3 py-3 text-left text-sm text-blue-600">{formatCurrency(totalDebit, settings.currency)}</td>
+                <td className="px-3 py-3 text-left text-sm text-green-600">{formatCurrency(totalCredit, settings.currency)}</td>
               </tr>
             </tfoot>
           </table>
         </div>
-        {filtered.length === 0 && <p className="text-center text-slate-500 py-8">سندی یافت نشد</p>}
-        {filtered.length > 100 && <p className="text-center text-xs text-slate-400 py-2">نمایش ۱۰۰ سند اول از {filtered.length}</p>}
+        {filtered.length === 0 && (
+          <div className="text-center py-12">
+            <BookOpen size={64} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+            <p className="text-lg font-medium text-slate-500 dark:text-slate-400">سندی یافت نشد</p>
+          </div>
+        )}
+        {filtered.length > 100 && (
+          <p className="text-center text-xs text-slate-400 py-2">
+            نمایش ۱۰۰ سند اول از {filtered.length}
+          </p>
+        )}
       </div>
 
       {/* Balance Check */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 text-center">
+      <div className="card p-5 text-center">
         {Math.abs(totalDebit - totalCredit) < 1 ? (
-          <span className="text-sm text-green-600">✓ اسناد متوازن هستند</span>
+          <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
+            <CheckCircle size={20} />
+            <span className="text-sm font-medium">اسناد متوازن هستند</span>
+          </div>
         ) : (
-          <span className="text-sm text-red-600">✗ مغایرت: {formatCurrency(Math.abs(totalDebit - totalCredit), settings.currency)}</span>
+          <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400">
+            <XCircle size={20} />
+            <span className="text-sm font-medium">
+              مغایرت: {formatCurrency(Math.abs(totalDebit - totalCredit), settings.currency)}
+            </span>
+          </div>
         )}
       </div>
     </div>
