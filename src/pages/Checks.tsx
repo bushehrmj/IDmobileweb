@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, useToast, formatCurrency, toJalali } from '../lib/auth';
 import { financialDb, type Check } from '../lib/financialDb';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, X, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import { 
+  Plus, X, FileText, AlertTriangle, CheckCircle, Clock,
+  Filter, Calendar
+} from 'lucide-react';
 
 export default function Checks() {
   const { user, hasPermission } = useAuth();
@@ -10,22 +15,39 @@ export default function Checks() {
   const [activeTab, setActiveTab] = useState<'received' | 'paid'>('received');
   const [checks, setChecks] = useState<Check[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [form, setForm] = useState<any>({
     type: 'received' as 'received' | 'paid',
-    number: '', bankName: '', amount: 0,
+    number: '',
+    bankName: '',
+    amount: 0,
     issueDate: new Date().toISOString().split('T')[0],
-    dueDate: '', partyName: '', description: '',
+    dueDate: '',
+    partyName: '',
+    description: '',
   });
 
-  useEffect(() => { loadChecks(); }, []);
+  useEffect(() => { 
+    loadChecks(); 
+  }, []);
 
   const loadChecks = () => setChecks(financialDb.getChecks().reverse());
 
   const receivedChecks = checks.filter(c => c.type === 'received');
   const paidChecks = checks.filter(c => c.type === 'paid');
 
+  const filteredChecks = (activeTab === 'received' ? receivedChecks : paidChecks).filter(c => {
+    const matchSearch = c.number.includes(search) || c.partyName.includes(search) || c.bankName.includes(search);
+    const matchStatus = statusFilter === 'all' || c.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
   const totalReceived = receivedChecks.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
   const totalPaid = paidChecks.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
+
+  const settings = JSON.parse(localStorage.getItem('idmobile_settings') || '{}');
+  const currency = settings.currency || 'تومان';
 
   // Alerts
   const today = new Date();
@@ -42,9 +64,6 @@ export default function Checks() {
     const due = new Date(c.dueDate);
     return due < today && c.status === 'pending';
   });
-
-  const settings = JSON.parse(localStorage.getItem('idmobile_settings') || '{}');
-  const currency = settings.currency || 'تومان';
 
   const save = () => {
     if (!form.number) { showToast('error', 'شماره چک الزامی است'); return; }
@@ -69,8 +88,21 @@ export default function Checks() {
     financialDb.saveCheck(check);
     showToast('success', 'چک ثبت شد');
     setShowForm(false);
-    setForm({ type: 'received', number: '', bankName: '', amount: 0, issueDate: new Date().toISOString().split('T')[0], dueDate: '', partyName: '', description: '' });
+    resetForm();
     loadChecks();
+  };
+
+  const resetForm = () => {
+    setForm({
+      type: 'received',
+      number: '',
+      bankName: '',
+      amount: 0,
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: '',
+      partyName: '',
+      description: '',
+    });
   };
 
   const updateStatus = (check: Check, newStatus: Check['status']) => {
@@ -81,39 +113,58 @@ export default function Checks() {
   };
 
   const statusLabels: Record<string, string> = {
-    pending: 'در انتظار', deposited: 'وصول شد', cleared: 'پاس شده',
-    bounced: 'برگشتی', transferred: 'واگذار', voided: 'باطل',
+    pending: 'در انتظار',
+    deposited: 'وصل شد',
+    cleared: 'پاس شده',
+    bounced: 'برگشتی',
+    transferred: 'واگذار',
+    voided: 'باطل',
   };
 
   const statusColors: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
-    deposited: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-    cleared: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-    bounced: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-    transferred: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-    voided: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
+    pending: 'badge-warning',
+    deposited: 'badge-info',
+    cleared: 'badge-success',
+    bounced: 'badge-error',
+    transferred: 'badge-info',
+    voided: 'badge-error',
   };
 
   return (
-    <div className="space-y-4 pb-20 lg:pb-0">
+    <div className="space-y-6 pb-20 lg:pb-0 animate-fadeIn">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">مدیریت چک‌ها</h2>
-        <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
-          <Plus size={16} /> ثبت چک
-        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">مدیریت چک‌ها</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">مدیریت چک‌های دریافتی و پرداختی</p>
+        </div>
+        <Button variant="primary" onClick={() => setShowForm(true)}>
+          <Plus size={18} />
+          ثبت چک
+        </Button>
       </div>
 
       {/* Alerts */}
       {(dueToday.length > 0 || overdue.length > 0) && (
         <div className="space-y-2">
           {overdue.length > 0 && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
-              <AlertTriangle size={16} /> {overdue.length} چک سررسید گذشته
+            <div className="card p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />
+                <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                  {overdue.length} چک سررسید گذشته
+                </span>
+              </div>
             </div>
           )}
           {dueToday.length > 0 && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
-              <Clock size={16} /> {dueToday.length} چک سررسید امروز
+            <div className="card p-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800">
+              <div className="flex items-center gap-3">
+                <Clock size={20} className="text-amber-600 dark:text-amber-400" />
+                <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                  {dueToday.length} چک سررسید امروز
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -121,133 +172,214 @@ export default function Checks() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 text-white">
-          <p className="text-sm mb-1">چک‌های دریافتی در انتظار</p>
-          <p className="text-xl font-bold">{formatCurrency(totalReceived, currency)}</p>
+        <div className="card-gradient-teal p-6 text-white rounded-2xl">
+          <p className="text-sm mb-2">چک‌های دریافتی در انتظار</p>
+          <p className="text-3xl font-bold">{formatCurrency(totalReceived, currency)}</p>
+          <p className="text-xs mt-2 opacity-80">{receivedChecks.filter(c => c.status === 'pending').length} چک</p>
         </div>
-        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-4 text-white">
-          <p className="text-sm mb-1">چک‌های پرداختی در انتظار</p>
-          <p className="text-xl font-bold">{formatCurrency(totalPaid, currency)}</p>
+        <div className="card-gradient-orange p-6 text-white rounded-2xl">
+          <p className="text-sm mb-2">چک‌های پرداختی در انتظار</p>
+          <p className="text-3xl font-bold">{formatCurrency(totalPaid, currency)}</p>
+          <p className="text-xs mt-2 opacity-80">{paidChecks.filter(c => c.status === 'pending').length} چک</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-        <button onClick={() => setActiveTab('received')}
-          className={`px-4 py-2 text-sm font-medium ${activeTab === 'received' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`}>
-          چک‌های دریافتی ({receivedChecks.length})
-        </button>
-        <button onClick={() => setActiveTab('paid')}
-          className={`px-4 py-2 text-sm font-medium ${activeTab === 'paid' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`}>
-          چک‌های پرداختی ({paidChecks.length})
-        </button>
-      </div>
+      <div className="card">
+        <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700 p-2">
+          <button 
+            onClick={() => setActiveTab('received')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'received' 
+                ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400' 
+                : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            چک‌های دریافتی ({receivedChecks.length})
+          </button>
+          <button 
+            onClick={() => setActiveTab('paid')}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'paid' 
+                ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400' 
+                : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            چک‌های پرداختی ({paidChecks.length})
+          </button>
+        </div>
 
-      {/* Checks List */}
-      <div className="space-y-2">
-        {(activeTab === 'received' ? receivedChecks : paidChecks).map(check => (
-          <div key={check.id} className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-sm">چک #{check.number}</p>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusColors[check.status]}`}>
-                    {statusLabels[check.status]}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">{check.bankName} | {check.partyName}</p>
-                <p className="text-xs text-slate-500">سررسید: {toJalali(check.dueDate)}</p>
-                {check.description && <p className="text-xs text-slate-400 mt-1">{check.description}</p>}
+        <div className="p-5">
+          {/* Filters */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter size={20} className="text-slate-500" />
+              <h3 className="font-bold text-slate-900 dark:text-white">فیلتر</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="جستجو شماره، نام، بانک..." 
+                  className="input" 
+                />
               </div>
-              <div className="text-left">
-                <p className={`text-lg font-bold ${check.type === 'received' ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(check.amount, currency)}
-                </p>
-                {check.status === 'pending' && (
-                  <select value={check.status} onChange={e => updateStatus(check, e.target.value as Check['status'])}
-                    className="mt-1 text-xs px-2 py-1 border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-700">
-                    {Object.entries(statusLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                )}
-              </div>
+              <select 
+                value={statusFilter} 
+                onChange={e => setStatusFilter(e.target.value)}
+                className="input"
+              >
+                <option value="all">همه وضعیت‌ها</option>
+                {Object.entries(statusLabels).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
             </div>
           </div>
-        ))}
-        {(activeTab === 'received' ? receivedChecks : paidChecks).length === 0 && (
-          <p className="text-center text-slate-500 py-8">چکی ثبت نشده</p>
-        )}
+
+          {/* Checks List */}
+          <div className="space-y-3">
+            {filteredChecks.map(check => (
+              <div key={check.id} className="card p-5 hover:shadow-lg transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText size={20} className={check.type === 'received' ? 'text-green-500' : 'text-red-500'} />
+                      <p className="font-bold text-lg text-slate-900 dark:text-white">
+                        چک #{check.number}
+                      </p>
+                      <span className={`badge ${statusColors[check.status]}`}>
+                        {statusLabels[check.status]}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+                      <p>{check.bankName} | {check.partyName}</p>
+                      <p>سررسید: {toJalali(check.dueDate)}</p>
+                      {check.description && <p className="text-xs">{check.description}</p>}
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <p className={`text-xl font-bold ${check.type === 'received' ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(check.amount, currency)}
+                    </p>
+                    {check.status === 'pending' && (
+                      <select 
+                        value={check.status} 
+                        onChange={e => updateStatus(check, e.target.value as Check['status'])}
+                        className="mt-2 text-xs px-2 py-1 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700"
+                      >
+                        {Object.entries(statusLabels).map(([k, v]) => (
+                          <option key={k} value={k}>{v}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {filteredChecks.length === 0 && (
+              <div className="text-center py-12">
+                <FileText size={64} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                <p className="text-lg font-medium text-slate-500 dark:text-slate-400">چکی ثبت نشده</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-xl w-full max-w-md p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold">ثبت چک</h3>
-              <button onClick={() => setShowForm(false)} className="text-slate-500"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-scaleIn">
+            <div className="sticky top-0 bg-white dark:bg-slate-800 p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between z-10">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">ثبت چک</h3>
+              <button onClick={() => { setShowForm(false); resetForm(); }} className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 p-2 rounded-lg">
+                <X size={24} />
+              </button>
             </div>
-
-            <div>
-              <label className="text-xs text-slate-500">نوع چک</label>
-              <div className="flex gap-2 mt-1">
-                <button onClick={() => setForm({ ...form, type: 'received' })}
-                  className={`flex-1 py-2 rounded-lg text-sm ${form.type === 'received' ? 'bg-green-600 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                  دریافتی
-                </button>
-                <button onClick={() => setForm({ ...form, type: 'paid' })}
-                  className={`flex-1 py-2 rounded-lg text-sm ${form.type === 'paid' ? 'bg-red-600 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                  پرداختی
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            <div className="p-5 space-y-4">
               <div>
-                <label className="text-xs text-slate-500">شماره چک *</label>
-                <input type="text" value={form.number} onChange={e => setForm({ ...form, number: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">نوع چک</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={form.type === 'received' ? 'success' : 'outline'}
+                    className="flex-1"
+                    onClick={() => setForm({ ...form, type: 'received' })}
+                  >
+                    دریافتی
+                  </Button>
+                  <Button
+                    variant={form.type === 'paid' ? 'danger' : 'outline'}
+                    className="flex-1"
+                    onClick={() => setForm({ ...form, type: 'paid' })}
+                  >
+                    پرداختی
+                  </Button>
+                </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="شماره چک *"
+                  value={form.number}
+                  onChange={e => setForm({ ...form, number: e.target.value })}
+                />
+                <Input
+                  label="بانک"
+                  value={form.bankName}
+                  onChange={e => setForm({ ...form, bankName: e.target.value })}
+                />
+              </div>
+
+              <Input
+                label="مبلغ *"
+                type="number"
+                value={form.amount}
+                onChange={e => setForm({ ...form, amount: Number(e.target.value) })}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="تاریخ صدور"
+                  type="date"
+                  value={form.issueDate}
+                  onChange={e => setForm({ ...form, issueDate: e.target.value })}
+                />
+                <Input
+                  label="تاریخ سررسید *"
+                  type="date"
+                  value={form.dueDate}
+                  onChange={e => setForm({ ...form, dueDate: e.target.value })}
+                />
+              </div>
+
+              <Input
+                label={form.type === 'received' ? 'از طرف' : 'در وجه'}
+                value={form.partyName}
+                onChange={e => setForm({ ...form, partyName: e.target.value })}
+              />
+
               <div>
-                <label className="text-xs text-slate-500">بانک</label>
-                <input type="text" value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">توضیحات</label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm({ ...form, description: e.target.value })}
+                  className="input"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button variant="outline" className="flex-1" onClick={() => { setShowForm(false); resetForm(); }}>
+                  انصراف
+                </Button>
+                <Button variant="primary" className="flex-1" onClick={save}>
+                  ثبت چک
+                </Button>
               </div>
             </div>
-
-            <div>
-              <label className="text-xs text-slate-500">مبلغ *</label>
-              <input type="number" value={form.amount} onChange={e => setForm({ ...form, amount: Number(e.target.value) })}
-                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-slate-500">تاریخ صدور</label>
-                <input type="date" value={form.issueDate} onChange={e => setForm({ ...form, issueDate: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-500">تاریخ سررسید *</label>
-                <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-slate-500">{form.type === 'received' ? 'از طرف' : 'در وجه'}</label>
-              <input type="text" value={form.partyName} onChange={e => setForm({ ...form, partyName: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-            </div>
-
-            <div>
-              <label className="text-xs text-slate-500">توضیحات</label>
-              <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-sm bg-slate-50 dark:bg-slate-700" />
-            </div>
-
-            <button onClick={save} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium">
-              ثبت چک
-            </button>
           </div>
         </div>
       )}
