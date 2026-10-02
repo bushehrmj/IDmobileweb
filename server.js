@@ -1,27 +1,27 @@
 /**
  * ID Mobile Manager Pro - Unified Server
  * Serves both Frontend and Backend API
- * ES Module
+ * Uses sql.js (pure JavaScript SQLite)
  */
 
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import Database from 'better-sqlite3';
+import initSqlJs from 'sql.js';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production-12345';
+const JWT_SECRET = process.env.JWT_SECRET || 'id-mobile-manager-secret-key-2024';
 const DIST_DIR = path.join(__dirname, 'dist');
+const DB_PATH = path.join(__dirname, 'data', 'idmobile.db');
 
 // Middleware
 app.use(cors());
@@ -29,25 +29,40 @@ app.use(express.json());
 app.use(express.static(DIST_DIR));
 
 // Database Setup
-const dbPath = path.join(__dirname, 'data', 'idmobile.db');
 const dataDir = path.join(__dirname, 'data');
-
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const db = new Database(dbPath);
+let db;
 
-// Enable WAL mode for better performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// Helper to generate UUID
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
-// Initialize Database Schema
-function initializeDatabase() {
-  console.log('📦 Initializing database schema...');
+// Initialize Database
+async function initializeDatabase() {
+  console.log('📦 Initializing database...');
+  
+  const SQL = await initSqlJs();
+  
+  // Load existing database or create new one
+  if (fs.existsSync(DB_PATH)) {
+    const buffer = fs.readFileSync(DB_PATH);
+    db = new SQL.Database(buffer);
+    console.log('✅ Database loaded from file');
+  } else {
+    db = new SQL.Database();
+    console.log('✅ New database created');
+  }
 
-  // Users table
-  db.exec(`
+  // Create tables
+  db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
@@ -64,8 +79,7 @@ function initializeDatabase() {
     )
   `);
 
-  // Sessions table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -75,13 +89,11 @@ function initializeDatabase() {
       last_activity TEXT NOT NULL,
       device TEXT,
       ip TEXT,
-      active INTEGER DEFAULT 1,
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      active INTEGER DEFAULT 1
     )
   `);
 
-  // Products table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -106,11 +118,7 @@ function initializeDatabase() {
     )
   `);
 
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)`);
-
-  // Product Serials table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS product_serials (
       id TEXT PRIMARY KEY,
       product_id TEXT NOT NULL,
@@ -120,15 +128,11 @@ function initializeDatabase() {
       status TEXT DEFAULT 'available',
       purchase_id TEXT,
       sale_id TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (product_id) REFERENCES products(id)
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_product_serials_imei1 ON product_serials(imei1)`);
-
-  // Customers table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS customers (
       id TEXT PRIMARY KEY,
       first_name TEXT NOT NULL,
@@ -146,10 +150,7 @@ function initializeDatabase() {
     )
   `);
 
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_customers_mobile ON customers(mobile)`);
-
-  // Sales table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS sales (
       id TEXT PRIMARY KEY,
       invoice_number TEXT UNIQUE NOT NULL,
@@ -169,16 +170,11 @@ function initializeDatabase() {
       payment_method TEXT DEFAULT 'cash',
       status TEXT DEFAULT 'completed',
       notes TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (customer_id) REFERENCES customers(id)
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_sales_invoice_number ON sales(invoice_number)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date)`);
-
-  // Sale Items table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS sale_items (
       id TEXT PRIMARY KEY,
       sale_id TEXT NOT NULL,
@@ -193,14 +189,11 @@ function initializeDatabase() {
       buy_price REAL DEFAULT 0,
       sell_price REAL DEFAULT 0,
       discount REAL DEFAULT 0,
-      total REAL DEFAULT 0,
-      FOREIGN KEY (sale_id) REFERENCES sales(id),
-      FOREIGN KEY (product_id) REFERENCES products(id)
+      total REAL DEFAULT 0
     )
   `);
 
-  // Purchases table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS purchases (
       id TEXT PRIMARY KEY,
       invoice_number TEXT UNIQUE NOT NULL,
@@ -217,8 +210,7 @@ function initializeDatabase() {
     )
   `);
 
-  // Purchase Items table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS purchase_items (
       id TEXT PRIMARY KEY,
       purchase_id TEXT NOT NULL,
@@ -227,14 +219,11 @@ function initializeDatabase() {
       quantity INTEGER DEFAULT 1,
       buy_price REAL DEFAULT 0,
       total REAL DEFAULT 0,
-      imeis TEXT,
-      FOREIGN KEY (purchase_id) REFERENCES purchases(id),
-      FOREIGN KEY (product_id) REFERENCES products(id)
+      imeis TEXT
     )
   `);
 
-  // Repairs table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS repairs (
       id TEXT PRIMARY KEY,
       ticket_number TEXT UNIQUE NOT NULL,
@@ -268,11 +257,7 @@ function initializeDatabase() {
     )
   `);
 
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_repairs_ticket_number ON repairs(ticket_number)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_repairs_status ON repairs(status)`);
-
-  // Stock Movements table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS stock_movements (
       id TEXT PRIMARY KEY,
       product_id TEXT NOT NULL,
@@ -285,13 +270,11 @@ function initializeDatabase() {
       user_id TEXT,
       user_name TEXT,
       date TEXT DEFAULT CURRENT_TIMESTAMP,
-      notes TEXT,
-      FOREIGN KEY (product_id) REFERENCES products(id)
+      notes TEXT
     )
   `);
 
-  // Payments table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS payments (
       id TEXT PRIMARY KEY,
       customer_id TEXT,
@@ -304,13 +287,11 @@ function initializeDatabase() {
       reference_id TEXT,
       user_id TEXT,
       date TEXT DEFAULT CURRENT_TIMESTAMP,
-      notes TEXT,
-      FOREIGN KEY (customer_id) REFERENCES customers(id)
+      notes TEXT
     )
   `);
 
-  // Audit Logs table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS audit_logs (
       id TEXT PRIMARY KEY,
       user_id TEXT,
@@ -325,46 +306,69 @@ function initializeDatabase() {
     )
   `);
 
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_logs_date ON audit_logs(date)`);
-
-  // Settings table
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     )
   `);
 
-  console.log('✅ Database schema initialized');
+  // Create indexes
+  db.run(`CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_product_serials_imei1 ON product_serials(imei1)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_customers_mobile ON customers(mobile)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_sales_invoice_number ON sales(invoice_number)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_repairs_ticket_number ON repairs(ticket_number)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_repairs_status ON repairs(status)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_audit_logs_date ON audit_logs(date)`);
 
   // Create default admin user
-  const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
-  
-  if (!adminExists) {
+  const result = db.exec("SELECT id FROM users WHERE username = 'admin'");
+  if (result.length === 0) {
     const passwordHash = bcrypt.hashSync('admin123', 10);
-    
-    db.prepare(`
-      INSERT INTO users (id, username, password_hash, full_name, role, permissions, visible_pages, active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      uuidv4(),
-      'admin',
-      passwordHash,
-      'مدیر سیستم',
-      'admin',
-      JSON.stringify(['*']),
-      JSON.stringify(['*']),
-      1
+    db.run(
+      `INSERT INTO users (id, username, password_hash, full_name, role, permissions, visible_pages, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), 'admin', passwordHash, 'مدیر سیستم', 'admin', JSON.stringify(['*']), JSON.stringify(['*']), 1]
     );
-    
     console.log('✅ Default admin user created');
     console.log('   Username: admin');
     console.log('   Password: admin123');
   }
+
+  // Save database to file
+  saveDatabase();
+  console.log('✅ Database schema initialized');
 }
 
-// Initialize database
-initializeDatabase();
+// Save database to file
+function saveDatabase() {
+  const data = db.export();
+  const buffer = Buffer.from(data);
+  fs.writeFileSync(DB_PATH, buffer);
+}
+
+// Helper to query all rows
+function queryAll(sql, params = []) {
+  const stmt = db.prepare(sql);
+  if (params.length > 0) {
+    stmt.bind(params);
+  }
+  const results = [];
+  while (stmt.step()) {
+    results.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return results;
+}
+
+// Helper to query one row
+function queryOne(sql, params = []) {
+  const results = queryAll(sql, params);
+  return results.length > 0 ? results[0] : null;
+}
 
 // Authentication Middleware
 function authenticateToken(req, res, next) {
@@ -375,13 +379,13 @@ function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
+  try {
+    const user = jwt.verify(token, JWT_SECRET);
     req.user = user;
     next();
-  });
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
 }
 
 // Permission Middleware
@@ -403,7 +407,7 @@ function checkPermission(permission) {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), database: 'sql.js' });
 });
 
 // Auth Routes
@@ -411,7 +415,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const user = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(username);
+    const user = queryOne('SELECT * FROM users WHERE username = ? AND active = 1', [username]);
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -435,25 +439,17 @@ app.post('/api/auth/login', async (req, res) => {
     );
 
     // Update last login
-    db.prepare('UPDATE users SET last_login = ? WHERE id = ?')
-      .run(new Date().toISOString(), user.id);
+    db.run('UPDATE users SET last_login = ? WHERE id = ?', [new Date().toISOString(), user.id]);
 
     // Create session
     const sessionId = uuidv4();
-    db.prepare(`
-      INSERT INTO sessions (id, user_id, username, role, login_time, last_activity, device, ip, active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      sessionId,
-      user.id,
-      user.username,
-      user.role,
-      new Date().toISOString(),
-      new Date().toISOString(),
-      req.headers['user-agent'],
-      req.ip,
-      1
+    db.run(
+      `INSERT INTO sessions (id, user_id, username, role, login_time, last_activity, device, ip, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sessionId, user.id, user.username, user.role, new Date().toISOString(), new Date().toISOString(), req.headers['user-agent'], req.ip, 1]
     );
+
+    saveDatabase();
 
     res.json({
       token,
@@ -474,7 +470,8 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/auth/logout', authenticateToken, (req, res) => {
   try {
-    db.prepare('UPDATE sessions SET active = 0 WHERE user_id = ?').run(req.user.id);
+    db.run('UPDATE sessions SET active = 0 WHERE user_id = ?', [req.user.id]);
+    saveDatabase();
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Logout failed' });
@@ -483,7 +480,7 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, (req, res) => {
   try {
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+    const user = queryOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -505,7 +502,7 @@ app.get('/api/auth/me', authenticateToken, (req, res) => {
 // Products Routes
 app.get('/api/products', authenticateToken, (req, res) => {
   try {
-    const products = db.prepare('SELECT * FROM products ORDER BY created_at DESC').all();
+    const products = queryAll('SELECT * FROM products ORDER BY created_at DESC');
     res.json(products);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch products' });
@@ -514,7 +511,7 @@ app.get('/api/products', authenticateToken, (req, res) => {
 
 app.get('/api/products/:id', authenticateToken, (req, res) => {
   try {
-    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+    const product = queryOne('SELECT * FROM products WHERE id = ?', [req.params.id]);
     
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -531,34 +528,21 @@ app.post('/api/products', authenticateToken, checkPermission('products.create'),
     const id = uuidv4();
     const now = new Date().toISOString();
     
-    db.prepare(`
-      INSERT INTO products (id, name, brand, model, category, sku, barcode, imei_required, serial_required, 
+    db.run(
+      `INSERT INTO products (id, name, brand, model, category, sku, barcode, imei_required, serial_required, 
                            color, storage, description, buy_price, sell_price, min_stock, stock, status, 
                            dollar_rate_at_purchase, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      req.body.name,
-      req.body.brand || '',
-      req.body.model || '',
-      req.body.category || '',
-      req.body.sku || '',
-      req.body.barcode || '',
-      req.body.imeiRequired ? 1 : 0,
-      req.body.serialRequired ? 1 : 0,
-      req.body.color || '',
-      req.body.storage || '',
-      req.body.description || '',
-      req.body.buyPrice || 0,
-      req.body.sellPrice || 0,
-      req.body.minStock || 0,
-      req.body.stock || 0,
-      req.body.status || 'active',
-      req.body.dollarRateAtPurchase || null,
-      now,
-      now
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.body.name, req.body.brand || '', req.body.model || '', req.body.category || '',
+        req.body.sku || '', req.body.barcode || '', req.body.imeiRequired ? 1 : 0, req.body.serialRequired ? 1 : 0,
+        req.body.color || '', req.body.storage || '', req.body.description || '',
+        req.body.buyPrice || 0, req.body.sellPrice || 0, req.body.minStock || 0, req.body.stock || 0,
+        req.body.status || 'active', req.body.dollarRateAtPurchase || null, now, now
+      ]
     );
 
+    saveDatabase();
     res.json({ id, message: 'Product created successfully' });
   } catch (error) {
     console.error('Create product error:', error);
@@ -569,7 +553,7 @@ app.post('/api/products', authenticateToken, checkPermission('products.create'),
 // Customers Routes
 app.get('/api/customers', authenticateToken, (req, res) => {
   try {
-    const customers = db.prepare('SELECT * FROM customers ORDER BY created_at DESC').all();
+    const customers = queryAll('SELECT * FROM customers ORDER BY created_at DESC');
     res.json(customers);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch customers' });
@@ -580,26 +564,18 @@ app.post('/api/customers', authenticateToken, checkPermission('customers.create'
   try {
     const id = uuidv4();
     
-    db.prepare(`
-      INSERT INTO customers (id, first_name, last_name, mobile, national_id, address, notes, 
+    db.run(
+      `INSERT INTO customers (id, first_name, last_name, mobile, national_id, address, notes, 
                             total_purchase, total_paid, debt, invoice_count, last_purchase, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      req.body.firstName,
-      req.body.lastName || '',
-      req.body.mobile || '',
-      req.body.nationalId || '',
-      req.body.address || '',
-      req.body.notes || '',
-      0,
-      0,
-      0,
-      0,
-      null,
-      new Date().toISOString()
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.body.firstName, req.body.lastName || '', req.body.mobile || '',
+        req.body.nationalId || '', req.body.address || '', req.body.notes || '',
+        0, 0, 0, 0, null, new Date().toISOString()
+      ]
     );
 
+    saveDatabase();
     res.json({ id, message: 'Customer created successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create customer' });
@@ -609,7 +585,7 @@ app.post('/api/customers', authenticateToken, checkPermission('customers.create'
 // Sales Routes
 app.get('/api/sales', authenticateToken, (req, res) => {
   try {
-    const sales = db.prepare('SELECT * FROM sales ORDER BY created_at DESC').all();
+    const sales = queryAll('SELECT * FROM sales ORDER BY created_at DESC');
     res.json(sales);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch sales' });
@@ -636,9 +612,12 @@ function getLocalIPs() {
 }
 
 // Start Server
-app.listen(PORT, '0.0.0.0', () => {
-  const ips = getLocalIPs();
-  console.log(`
+async function startServer() {
+  await initializeDatabase();
+  
+  app.listen(PORT, '0.0.0.0', () => {
+    const ips = getLocalIPs();
+    console.log(`
 ╔══════════════════════════════════════════════════════╗
 ║        ID Mobile Manager Pro - Unified Server       ║
 ╠══════════════════════════════════════════════════════╣
@@ -648,17 +627,23 @@ app.listen(PORT, '0.0.0.0', () => {
 ║    → http://localhost:${PORT}                          ║
 ║                                                      ║
 ║  Access from mobile/tablet on same WiFi:             ║`);
-  ips.forEach(ip => {
-    console.log(`║    → http://${ip}:${PORT}${' '.repeat(Math.max(0, 35 - ip.length))}║`);
-  });
-  console.log(`║                                                      ║
+    ips.forEach(ip => {
+      console.log(`║    → http://${ip}:${PORT}${' '.repeat(Math.max(0, 35 - ip.length))}║`);
+    });
+    console.log(`║                                                      ║
 ║  Default login: admin / admin123                     ║
 ║  (Change password on first login)                    ║
 ║                                                      ║
-║  Database: SQLite (data/idmobile.db)                 ║
+║  Database: SQLite (data/idmobile.db)                ║
 ║  API: http://localhost:${PORT}/api                     ║
 ║                                                      ║
 ║  Press Ctrl+C to stop the server                     ║
 ╚══════════════════════════════════════════════════════╝
-  `);
+    `);
+  });
+}
+
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
