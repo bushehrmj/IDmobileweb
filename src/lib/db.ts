@@ -424,7 +424,7 @@ export interface Payment {
   customerName: string;
   type: 'received' | 'paid';
   amount: number;
-  method: 'cash' | 'card' | 'transfer';
+  method: 'cash' | 'card' | 'transfer' | 'check' | 'other';
   reference: string;
   referenceType: 'sale' | 'purchase' | 'repair';
   referenceId: string;
