@@ -55,6 +55,7 @@ const menuItems: MenuItem[] = [
   { id: 'printsettings', label: 'تنظیمات چاپ', icon: Printer, permission: 'settings.view' },
   { id: 'printhistory', label: 'تاریخچه چاپ', icon: FileText, permission: 'settings.view' },
   { id: 'apistatus', label: 'وضعیت API', icon: Server, permission: 'settings.view' },
+  { id: 'migration', label: 'Migration داده‌ها', icon: Database, permission: 'backup.create' },
   { id: 'backup', label: 'پشتیبان‌گیری', icon: Database, permission: 'backup.create' },
 ];
 

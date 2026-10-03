@@ -971,6 +971,117 @@ app.get('/api/audit-logs', authenticateToken, (req, res) => {
   }
 });
 
+// Migration Routes
+app.post('/api/migration/import', authenticateToken, checkPermission('backup.restore'), (req, res) => {
+  try {
+    const data = req.body;
+    let importedCount = 0;
+    const errors = [];
+
+    // Import Users
+    if (data.users && data.users.length > 0) {
+      for (const user of data.users) {
+        try {
+          const existing = queryOne('SELECT id FROM users WHERE username = ?', [user.username]);
+          if (!existing) {
+            db.run(
+              `INSERT INTO users (id, username, password_hash, full_name, role, permissions, visible_pages, active, max_discount, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [user.id, user.username, user.passwordHash, user.fullName, user.role, 
+               JSON.stringify(user.permissions), JSON.stringify(user.visiblePages), 
+               user.active ? 1 : 0, user.maxDiscount || 0, user.createdAt]
+            );
+            importedCount++;
+          }
+        } catch (error) {
+          errors.push(`User ${user.username}: ${error.message}`);
+        }
+      }
+    }
+
+    // Import Products
+    if (data.products && data.products.length > 0) {
+      for (const product of data.products) {
+        try {
+          db.run(
+            `INSERT OR REPLACE INTO products (id, name, brand, model, category, sku, barcode, 
+             imei_required, serial_required, color, storage, description, buy_price, sell_price, 
+             min_stock, stock, status, dollar_rate_at_purchase, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [product.id, product.name, product.brand || '', product.model || '', product.category || '',
+             product.sku || '', product.barcode || '', product.imeiRequired ? 1 : 0, 
+             product.serialRequired ? 1 : 0, product.color || '', product.storage || '',
+             product.description || '', product.buyPrice || 0, product.sellPrice || 0,
+             product.minStock || 0, product.stock || 0, product.status || 'active',
+             product.dollarRateAtPurchase || null, product.createdAt, product.updatedAt]
+          );
+          importedCount++;
+        } catch (error) {
+          errors.push(`Product ${product.name}: ${error.message}`);
+        }
+      }
+    }
+
+    // Import Customers
+    if (data.customers && data.customers.length > 0) {
+      for (const customer of data.customers) {
+        try {
+          db.run(
+            `INSERT OR REPLACE INTO customers (id, first_name, last_name, mobile, national_id, 
+             address, notes, total_purchase, total_paid, debt, invoice_count, last_purchase, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [customer.id, customer.firstName, customer.lastName || '', customer.mobile || '',
+             customer.nationalId || '', customer.address || '', customer.notes || '',
+             customer.totalPurchase || 0, customer.totalPaid || 0, customer.debt || 0,
+             customer.invoiceCount || 0, customer.lastPurchase || null, customer.createdAt]
+          );
+          importedCount++;
+        } catch (error) {
+          errors.push(`Customer ${customer.firstName}: ${error.message}`);
+        }
+      }
+    }
+
+    saveDatabase();
+
+    res.json({
+      success: errors.length === 0,
+      message: errors.length === 0 ? 'Import completed successfully' : `Import completed with ${errors.length} errors`,
+      importedCount,
+      errors,
+    });
+  } catch (error) {
+    console.error('Import error:', error);
+    res.status(500).json({ error: 'Failed to import data' });
+  }
+});
+
+app.get('/api/migration/export', authenticateToken, checkPermission('backup.create'), (req, res) => {
+  try {
+    const data = {
+      users: queryAll('SELECT * FROM users'),
+      products: queryAll('SELECT * FROM products'),
+      productSerials: queryAll('SELECT * FROM product_serials'),
+      customers: queryAll('SELECT * FROM customers'),
+      sales: queryAll('SELECT * FROM sales'),
+      saleItems: queryAll('SELECT * FROM sale_items'),
+      repairs: queryAll('SELECT * FROM repairs'),
+      purchases: queryAll('SELECT * FROM purchases'),
+      purchaseItems: queryAll('SELECT * FROM purchase_items'),
+      payments: queryAll('SELECT * FROM payments'),
+      stockMovements: queryAll('SELECT * FROM stock_movements'),
+      auditLogs: queryAll('SELECT * FROM audit_logs'),
+      exportDate: new Date().toISOString(),
+      version: '2.0.0',
+    };
+
+    res.json(data);
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ error: 'Failed to export data' });
+  }
+});
+
 // Serve React App (SPA fallback)
 app.get('*', (req, res) => {
   res.sendFile(path.join(DIST_DIR, 'index.html'));

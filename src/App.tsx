@@ -36,6 +36,7 @@ const Profile = lazy(() => import('./pages/Profile'));
 const PrintSettings = lazy(() => import('./pages/PrintSettings'));
 const PrintHistory = lazy(() => import('./pages/PrintHistory'));
 const ApiStatus = lazy(() => import('./pages/ApiStatus'));
+const Migration = lazy(() => import('./pages/Migration'));
 
 // Initialize DB
 initializeDB();
@@ -126,6 +127,7 @@ function AppContent() {
     printsettings: 'settings.view',
     printhistory: 'settings.view',
     apistatus: 'settings.view',
+    migration: 'backup.create',
   };
 
   const requiredPermission = pagePermissionMap[currentPage];
@@ -220,6 +222,8 @@ function AppContent() {
         return <Suspense fallback={<PageLoading />}><PrintHistory /></Suspense>;
       case 'apistatus': 
         return <Suspense fallback={<PageLoading />}><ApiStatus /></Suspense>;
+      case 'migration': 
+        return <Suspense fallback={<PageLoading />}><Migration /></Suspense>;
       default: return <Dashboard />;
     }
   };
