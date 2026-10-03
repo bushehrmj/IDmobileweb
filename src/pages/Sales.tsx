@@ -950,25 +950,30 @@ export default function Sales() {
         </select>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="card p-4 text-center">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">تعداد فاکتور</p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">{filteredSales.length}</p>
-        </div>
-        <div className="card p-4 text-center">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">جمع فروش</p>
-          <p className="text-lg font-bold text-green-600">
-            {formatCurrency(filteredSales.reduce((s, x) => s + x.total, 0), settings.currency)}
-          </p>
-        </div>
-        <div className="card p-4 text-center">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">مانده بدهی</p>
-          <p className="text-lg font-bold text-red-600">
-            {formatCurrency(filteredSales.reduce((s, x) => s + x.remaining, 0), settings.currency)}
-          </p>
-        </div>
-      </div>
+      {/* Stats - فقط فاکتورهای completed را محاسبه کن */}
+      {(() => {
+        const completedSales = filteredSales.filter(s => s.status === 'completed');
+        return (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="card p-4 text-center">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">تعداد فاکتور</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">{completedSales.length}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">جمع فروش</p>
+              <p className="text-lg font-bold text-green-600">
+                {formatCurrency(completedSales.reduce((s, x) => s + x.total, 0), settings.currency)}
+              </p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">مانده بدهی</p>
+              <p className="text-lg font-bold text-red-600">
+                {formatCurrency(completedSales.reduce((s, x) => s + x.remaining, 0), settings.currency)}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="space-y-3">
         {filteredSales.map(sale => (
