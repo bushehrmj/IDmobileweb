@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { printManager, PrintSettings } from '../lib/printing/PrintManager';
+import { pdfService } from '../lib/printing/PdfService';
 import Button from './ui/Button';
 import type { } from 'react';
 import { 
@@ -94,9 +95,33 @@ export default function PrintCenter({
     }
   };
 
-  const handleSavePdf = () => {
-    // TODO: Implement PDF export
-    alert('ذخیره PDF به زودی اضافه می‌شود');
+  const handleSavePdf = async () => {
+    if (!previewRef.current) return;
+
+    try {
+      const filename = pdfService.generateFilename(
+        settings.documentType,
+        documentTitle,
+      );
+
+      await pdfService.downloadPdf(previewRef.current, filename, {
+        format: settings.paperSize === 'custom' ? 'custom' : settings.paperSize as any,
+        orientation: settings.orientation,
+        margin: {
+          top: `${settings.marginTop}mm`,
+          right: `${settings.marginRight}mm`,
+          bottom: `${settings.marginBottom}mm`,
+          left: `${settings.marginLeft}mm`,
+        },
+        quality: settings.quality === 'best' ? 'high' : settings.quality as any,
+        embedFonts: true,
+        includeBackground: true,
+        includeImages: true,
+      });
+    } catch (error) {
+      console.error('PDF save error:', error);
+      alert('خطا در ذخیره PDF');
+    }
   };
 
   const updateSetting = <K extends keyof PrintSettings>(

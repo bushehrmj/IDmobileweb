@@ -33,6 +33,8 @@ const SupplierAccounts = lazy(() => import('./pages/SupplierAccounts'));
 const ComprehensiveFinancialReport = lazy(() => import('./pages/ComprehensiveFinancialReport'));
 const SalesCharts = lazy(() => import('./pages/SalesCharts'));
 const Profile = lazy(() => import('./pages/Profile'));
+const PrintSettings = lazy(() => import('./pages/PrintSettings'));
+const PrintHistory = lazy(() => import('./pages/PrintHistory'));
 
 // Initialize DB
 initializeDB();
@@ -120,6 +122,8 @@ function AppContent() {
     comprehensivereport: 'financial.reports',
     salescharts: 'reports.view',
     profile: 'dashboard.view',
+    printsettings: 'settings.view',
+    printhistory: 'settings.view',
   };
 
   const requiredPermission = pagePermissionMap[currentPage];
@@ -208,6 +212,10 @@ function AppContent() {
         return <Suspense fallback={<PageLoading />}><SalesCharts /></Suspense>;
       case 'profile': 
         return <Suspense fallback={<PageLoading />}><Profile /></Suspense>;
+      case 'printsettings': 
+        return <Suspense fallback={<PageLoading />}><PrintSettings /></Suspense>;
+      case 'printhistory': 
+        return <Suspense fallback={<PageLoading />}><PrintHistory /></Suspense>;
       default: return <Dashboard />;
     }
   };
