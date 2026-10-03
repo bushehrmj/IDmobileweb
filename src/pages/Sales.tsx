@@ -28,6 +28,10 @@ export default function Sales() {
   const [productSearch, setProductSearch] = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    firstName: '', lastName: '', mobile: '', nationalId: '', address: '', notes: ''
+  });
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: '', brand: '', model: '', barcode: '', sellPrice: 0, buyPrice: 0, stock: 1
@@ -456,6 +460,38 @@ export default function Sales() {
     loadSales();
   };
 
+  const addNewCustomer = () => {
+    if (!newCustomer.firstName.trim() && !newCustomer.lastName.trim()) {
+      showToast('error', 'نام مشتری الزامی است');
+      return;
+    }
+    if (!newCustomer.mobile.trim()) {
+      showToast('error', 'شماره موبایل الزامی است');
+      return;
+    }
+
+    const customer: Customer = {
+      id: uuidv4(),
+      firstName: newCustomer.firstName,
+      lastName: newCustomer.lastName,
+      mobile: newCustomer.mobile,
+      nationalId: newCustomer.nationalId,
+      address: newCustomer.address,
+      notes: newCustomer.notes,
+      totalPurchase: 0,
+      totalPaid: 0,
+      debt: 0,
+      invoiceCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    db.saveCustomer(customer);
+    setSelectedCustomer(customer);
+    setShowAddCustomer(false);
+    setNewCustomer({ firstName: '', lastName: '', mobile: '', nationalId: '', address: '', notes: '' });
+    showToast('success', 'مشتری جدید اضافه شد');
+  };
+
   const products = db.getProducts().filter(p => p.status === 'active');
   const filteredProducts = products.filter(p =>
     p.name.includes(productSearch) || p.brand.includes(productSearch) || p.barcode?.includes(productSearch) || p.model?.includes(productSearch)
@@ -521,10 +557,16 @@ export default function Sales() {
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">مشتری</h3>
-            <Button variant="outline" size="sm" onClick={() => setShowCustomerSearch(true)}>
-              <UserPlus size={16} />
-              انتخاب مشتری
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowCustomerSearch(true)}>
+                <UserPlus size={16} />
+                انتخاب مشتری
+              </Button>
+              <Button variant="success" size="sm" onClick={() => setShowAddCustomer(true)}>
+                <Plus size={16} />
+                مشتری جدید
+              </Button>
+            </div>
           </div>
           {selectedCustomer ? (
             <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-2 border-blue-200 dark:border-blue-800">
@@ -836,6 +878,79 @@ export default function Sales() {
                     <p>مشتری‌ای یافت نشد</p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add New Customer Modal */}
+        {showAddCustomer && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scaleIn">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <h3 className="text-xl font-bold">ثبت مشتری جدید</h3>
+                <button onClick={() => { setShowAddCustomer(false); setNewCustomer({ firstName: '', lastName: '', mobile: '', nationalId: '', address: '', notes: '' }); }} className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 p-2 rounded-lg">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="نام *"
+                    value={newCustomer.firstName}
+                    onChange={e => setNewCustomer({ ...newCustomer, firstName: e.target.value })}
+                    placeholder="مثال: علی"
+                    autoFocus
+                  />
+                  <Input
+                    label="نام خانوادگی"
+                    value={newCustomer.lastName}
+                    onChange={e => setNewCustomer({ ...newCustomer, lastName: e.target.value })}
+                    placeholder="مثال: محمدی"
+                  />
+                </div>
+                <Input
+                  label="شماره موبایل *"
+                  type="tel"
+                  value={newCustomer.mobile}
+                  onChange={e => setNewCustomer({ ...newCustomer, mobile: e.target.value })}
+                  placeholder="09121234567"
+                />
+                <Input
+                  label="کد ملی"
+                  value={newCustomer.nationalId}
+                  onChange={e => setNewCustomer({ ...newCustomer, nationalId: e.target.value })}
+                  placeholder="0012345678"
+                />
+                <div>
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">آدرس</label>
+                  <textarea
+                    value={newCustomer.address}
+                    onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                    className="input"
+                    rows={2}
+                    placeholder="آدرس کامل..."
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">یادداشت</label>
+                  <textarea
+                    value={newCustomer.notes}
+                    onChange={e => setNewCustomer({ ...newCustomer, notes: e.target.value })}
+                    className="input"
+                    rows={2}
+                    placeholder="توضیحات اضافی..."
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <Button variant="outline" className="flex-1" onClick={() => { setShowAddCustomer(false); setNewCustomer({ firstName: '', lastName: '', mobile: '', nationalId: '', address: '', notes: '' }); }}>
+                    انصراف
+                  </Button>
+                  <Button variant="success" className="flex-1" onClick={addNewCustomer}>
+                    <UserPlus size={18} />
+                    ثبت و انتخاب
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
