@@ -312,3 +312,28 @@ body {
   background: #2563eb;
   color: white;
 }
+
+/* Print Two Copies for Repair Receipt */
+.print-two-copies {
+  background: white;
+}
+
+.receipt-copy {
+  page-break-inside: avoid;
+}
+
+@media print {
+  .print-two-copies {
+    width: 100%;
+  }
+  
+  .receipt-copy {
+    page-break-inside: avoid;
+    margin-bottom: 10mm;
+  }
+  
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}
