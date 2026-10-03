@@ -50,13 +50,18 @@ const menuItems: MenuItem[] = [
   { id: 'payments', label: 'پرداخت‌ها', icon: CreditCard, permission: 'reports.view' },
   { id: 'reports', label: 'گزارش‌ها', icon: BarChart3, permission: 'reports.view' },
   { id: 'salescharts', label: 'نمودارهای فروش', icon: PieChart, permission: 'reports.view' },
-  { id: 'users', label: 'کاربران', icon: UserCog, permission: 'users.view' },
-  { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, permission: 'settings.view' },
-  { id: 'printsettings', label: 'تنظیمات چاپ', icon: Printer, permission: 'settings.view' },
-  { id: 'printhistory', label: 'تاریخچه چاپ', icon: FileText, permission: 'settings.view' },
-  { id: 'apistatus', label: 'وضعیت API', icon: Server, permission: 'settings.view' },
-  { id: 'migration', label: 'Migration داده‌ها', icon: Database, permission: 'backup.create' },
-  { id: 'backup', label: 'پشتیبان‌گیری', icon: Database, permission: 'backup.create' },
+  {
+    id: 'settings', label: 'تنظیمات', icon: SettingsIcon, permission: 'settings.view',
+    children: [
+      { id: 'settings', label: 'تنظیمات فروشگاه', icon: SettingsIcon, permission: 'settings.view' },
+      { id: 'users', label: 'کاربران', icon: UserCog, permission: 'users.view' },
+      { id: 'printsettings', label: 'تنظیمات چاپ', icon: Printer, permission: 'settings.view' },
+      { id: 'printhistory', label: 'تاریخچه چاپ', icon: FileText, permission: 'settings.view' },
+      { id: 'apistatus', label: 'وضعیت API', icon: Server, permission: 'settings.view' },
+      { id: 'migration', label: 'Migration داده‌ها', icon: Database, permission: 'backup.create' },
+      { id: 'backup', label: 'پشتیبان‌گیری', icon: Database, permission: 'backup.create' },
+    ]
+  },
 ];
 
 export default function Layout({ children, currentPage, onNavigate }: LayoutProps) {
@@ -65,7 +70,7 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
   const [minimized, setMinimized] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['financial']);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['financial', 'settings']);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
