@@ -131,14 +131,6 @@ export default function Repairs() {
       updatedAt: new Date().toISOString(),
     };
 
-    if (editRepair) {
-      db.saveRepair(finalRepairData);
-      showToast('success', 'تعمیر ویرایش شد');
-    } else {
-      db.saveRepair(finalRepairData);
-      showToast('success', 'تعمیر ثبت شد');
-    }
-
     // اضافه کردن مشتری
     if (finalRepairData.customerName && finalRepairData.customerMobile) {
       const customerNames = finalRepairData.customerName.trim().split(' ');
@@ -168,7 +160,7 @@ export default function Repairs() {
       }
     }
 
-    // ایجاد فاکتور فروش هنگام تحویل و تسویه
+    // ایجاد یا به‌روزرسانی فاکتور فروش هنگام تحویل و تسویه
     if (finalRepairData.remaining === 0 && finalRepairData.status === 'delivered' && finalRepairData.finalTotal > 0) {
       const customer = db.getCustomers().find(c => 
         c.mobile === finalRepairData.customerMobile && finalRepairData.customerMobile !== ''
@@ -216,39 +208,68 @@ export default function Repairs() {
           });
         }
 
-        const sale = {
-          id: uuidv4(),
-          invoiceNumber: db.getNextInvoiceNumber(),
-          date: new Date().toISOString(),
-          time: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-          customerId: customer.id,
-          customerName: finalRepairData.customerName,
-          sellerId: user?.id || '',
-          sellerName: user?.fullName || '',
-          items: saleItems,
-          subtotal: finalRepairData.finalTotal,
-          discount: 0,
-          discountType: 'amount' as const,
-          tax: 0,
-          total: finalRepairData.finalTotal,
-          paid: finalRepairData.finalTotal,
-          remaining: 0,
-          paymentMethod: 'cash' as const,
-          status: 'completed' as const,
-          notes: `فاکتور تعمیر شماره ${finalRepairData.ticketNumber} - ${finalRepairData.brand} ${finalRepairData.model}`,
-          createdAt: new Date().toISOString(),
-        };
+        // بررسی آیا قبلاً فاکتوری برای این تعمیر ساخته شده
+        if (finalRepairData.saleId) {
+          // به‌روزرسانی فاکتور موجود
+          const existingSale = db.getSale(finalRepairData.saleId);
+          if (existingSale) {
+            existingSale.items = saleItems;
+            existingSale.subtotal = finalRepairData.finalTotal;
+            existingSale.total = finalRepairData.finalTotal;
+            existingSale.paid = finalRepairData.finalTotal;
+            existingSale.remaining = 0;
+            existingSale.notes = `فاکتور تعمیر شماره ${finalRepairData.ticketNumber} - ${finalRepairData.brand} ${finalRepairData.model}`;
+            db.saveSale(existingSale);
+            showToast('success', `فاکتور فروش #${existingSale.invoiceNumber} به‌روزرسانی شد`);
+          }
+        } else {
+          // ایجاد فاکتور جدید
+          const sale = {
+            id: uuidv4(),
+            invoiceNumber: db.getNextInvoiceNumber(),
+            date: new Date().toISOString(),
+            time: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+            customerId: customer.id,
+            customerName: finalRepairData.customerName,
+            sellerId: user?.id || '',
+            sellerName: user?.fullName || '',
+            items: saleItems,
+            subtotal: finalRepairData.finalTotal,
+            discount: 0,
+            discountType: 'amount' as const,
+            tax: 0,
+            total: finalRepairData.finalTotal,
+            paid: finalRepairData.finalTotal,
+            remaining: 0,
+            paymentMethod: 'cash' as const,
+            status: 'completed' as const,
+            notes: `فاکتور تعمیر شماره ${finalRepairData.ticketNumber} - ${finalRepairData.brand} ${finalRepairData.model}`,
+            createdAt: new Date().toISOString(),
+          };
 
-        db.saveSale(sale);
-        
-        customer.totalPurchase += finalRepairData.finalTotal;
-        customer.totalPaid += finalRepairData.finalTotal;
-        customer.invoiceCount += 1;
-        customer.lastPurchase = new Date().toISOString();
-        db.saveCustomer(customer);
-        
-        showToast('success', `فاکتور فروش #${sale.invoiceNumber} ایجاد شد`);
+          db.saveSale(sale);
+          
+          // ذخیره saleId در repair
+          finalRepairData.saleId = sale.id;
+          
+          customer.totalPurchase += finalRepairData.finalTotal;
+          customer.totalPaid += finalRepairData.finalTotal;
+          customer.invoiceCount += 1;
+          customer.lastPurchase = new Date().toISOString();
+          db.saveCustomer(customer);
+          
+          showToast('success', `فاکتور فروش #${sale.invoiceNumber} ایجاد شد`);
+        }
       }
+    }
+
+    // ذخیره نهایی تعمیر (فقط یک بار)
+    if (editRepair) {
+      db.saveRepair(finalRepairData);
+      showToast('success', 'تعمیر ویرایش شد');
+    } else {
+      db.saveRepair(finalRepairData);
+      showToast('success', 'تعمیر ثبت شد');
     }
 
     setShowForm(false);

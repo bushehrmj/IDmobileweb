@@ -258,6 +258,9 @@ export interface Repair {
   // اولویت
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   
+  // ارتباط با فاکتور فروش
+  saleId?: string; // ID فاکتور فروش مرتبط
+  
   notes: string;
   createdAt: string;
   updatedAt?: string;
