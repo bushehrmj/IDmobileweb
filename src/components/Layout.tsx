@@ -49,6 +49,7 @@ const menuItems: MenuItem[] = [
   },
   { id: 'payments', label: 'پرداخت‌ها', icon: CreditCard, permission: 'reports.view' },
   { id: 'reports', label: 'گزارش‌ها', icon: BarChart3, permission: 'reports.view' },
+  { id: 'salescharts', label: 'نمودارهای فروش', icon: PieChart, permission: 'reports.view' },
   { id: 'users', label: 'کاربران', icon: UserCog, permission: 'users.view' },
   { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, permission: 'settings.view' },
   { id: 'backup', label: 'پشتیبان‌گیری', icon: Database, permission: 'backup.create' },

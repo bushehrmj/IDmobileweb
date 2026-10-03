@@ -31,6 +31,7 @@ const Transfers = lazy(() => import('./pages/Transfers'));
 const CustomerAccounts = lazy(() => import('./pages/CustomerAccounts'));
 const SupplierAccounts = lazy(() => import('./pages/SupplierAccounts'));
 const ComprehensiveFinancialReport = lazy(() => import('./pages/ComprehensiveFinancialReport'));
+const SalesCharts = lazy(() => import('./pages/SalesCharts'));
 
 // Initialize DB
 initializeDB();
@@ -116,6 +117,7 @@ function AppContent() {
     customeraccounts: 'financial.receivables',
     supplieraccounts: 'financial.payables',
     comprehensivereport: 'financial.reports',
+    salescharts: 'reports.view',
   };
 
   const requiredPermission = pagePermissionMap[currentPage];
@@ -200,6 +202,8 @@ function AppContent() {
         return <Suspense fallback={<PageLoading />}><SupplierAccounts /></Suspense>;
       case 'comprehensivereport': 
         return <Suspense fallback={<PageLoading />}><ComprehensiveFinancialReport /></Suspense>;
+      case 'salescharts': 
+        return <Suspense fallback={<PageLoading />}><SalesCharts /></Suspense>;
       default: return <Dashboard />;
     }
   };
