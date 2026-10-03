@@ -308,39 +308,95 @@ export default function Sales() {
   };
 
   const cancelSale = (saleId: string) => {
-    if (!confirm('آیا از لغو این فاکتور مطمئن هستید؟')) return;
-    const sale = db.getSale(saleId);
-    if (!sale) return;
-    sale.status = 'cancelled';
-    db.saveSale(sale);
-    sale.items.forEach(item => {
-      const product = db.getProduct(item.productId);
-      if (product) {
-        product.stock += item.quantity;
-        db.saveProduct(product);
-        db.saveStockMovement({
-          id: uuidv4(), productId: product.id, productName: product.name,
-          type: 'in', quantity: item.quantity, reference: sale.invoiceNumber,
-          referenceType: 'return', referenceId: sale.id,
-          userId: user?.id || '', userName: user?.fullName || '',
-          date: new Date().toISOString(), notes: 'مرجوعی - لغو فاکتور',
-        });
-      }
-      if (item.imei1) {
-        const serial = db.getSerialByIMEI(item.imei1);
-        if (serial) { serial.status = 'returned'; db.saveSerial(serial); }
-      }
-    });
-    const customer = db.getCustomer(sale.customerId);
-    if (customer) {
-      customer.totalPurchase -= sale.total;
-      customer.totalPaid -= sale.paid;
-      customer.debt -= sale.remaining;
-      customer.invoiceCount -= 1;
-      db.saveCustomer(customer);
+    if (!confirm('آیا از لغو این فاکتور مطمئن هستید؟\n\nاین عملیات غیرقابل بازگشت است و موجودی کالاها به انبار بازگردانده می‌شود.')) {
+      return;
     }
-    showToast('success', 'فاکتور لغو شد');
-    loadSales();
+
+    const sale = db.getSale(saleId);
+    if (!sale) {
+      showToast('error', 'فاکتور یافت نشد');
+      return;
+    }
+
+    if (sale.status === 'cancelled') {
+      showToast('warning', 'این فاکتور قبلاً لغو شده است');
+      return;
+    }
+
+    try {
+      // تغییر وضعیت فاکتور به لغو شده
+      sale.status = 'cancelled';
+      db.saveSale(sale);
+
+      // بازگرداندن موجودی کالاها به انبار
+      sale.items.forEach(item => {
+        if (item.productId) {
+          const product = db.getProduct(item.productId);
+          if (product) {
+            product.stock += item.quantity;
+            product.updatedAt = new Date().toISOString();
+            db.saveProduct(product);
+            
+            // ثبت حرکت انبار
+            db.saveStockMovement({
+              id: uuidv4(),
+              productId: product.id,
+              productName: product.name,
+              type: 'in',
+              quantity: item.quantity,
+              reference: sale.invoiceNumber,
+              referenceType: 'return',
+              referenceId: sale.id,
+              userId: user?.id || '',
+              userName: user?.fullName || '',
+              date: new Date().toISOString(),
+              notes: 'مرجوعی - لغو فاکتور',
+            });
+          }
+        }
+        
+        // بازگرداندن وضعیت IMEI
+        if (item.imei1) {
+          const serial = db.getSerialByIMEI(item.imei1);
+          if (serial) {
+            serial.status = 'returned';
+            db.saveSerial(serial);
+          }
+        }
+      });
+
+      // به‌روزرسانی اطلاعات مشتری
+      if (sale.customerId) {
+        const customer = db.getCustomer(sale.customerId);
+        if (customer) {
+          customer.totalPurchase = Math.max(0, customer.totalPurchase - sale.total);
+          customer.totalPaid = Math.max(0, customer.totalPaid - sale.paid);
+          customer.debt = Math.max(0, customer.debt - sale.remaining);
+          customer.invoiceCount = Math.max(0, customer.invoiceCount - 1);
+          db.saveCustomer(customer);
+        }
+      }
+
+      // ثبت در لاگ
+      db.addAuditLog({
+        id: uuidv4(),
+        userId: user?.id || '',
+        userName: user?.fullName || '',
+        action: 'cancel_sale',
+        entity: 'sale',
+        entityId: sale.id,
+        oldValue: `فاکتور #${sale.invoiceNumber} - مبلغ ${sale.total}`,
+        newValue: 'لغو شد',
+        ip: '127.0.0.1',
+        date: new Date().toISOString(),
+      });
+
+      showToast('success', `فاکتور #${sale.invoiceNumber} با موفقیت لغو شد`);
+      loadSales();
+    } catch (error) {
+      console.error('Error canceling sale:', error);
+      showToast('error', 'خطا در لغو فاکتور');
+    }
   };
 
   const updateSale = (saleId: string, updates: Partial<Sale>) => {
