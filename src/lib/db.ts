@@ -531,25 +531,33 @@ export function verifyPassword(password: string, hash: string): boolean {
 export function initializeDB(): void {
   const initialized = localStorage.getItem(DB_PREFIX + 'initialized');
   
-  // Always run migration to update permissions
+  // Always run migration to update permissions and pages
   const users = getCollection<User>('users');
   if (users.length > 0) {
     let updated = false;
     users.forEach(user => {
       const rolePerms = getRolePermissions(user.role);
       const rolePages = getRolePages(user.role);
-      const missingPerms = rolePerms.filter(p => !user.permissions.includes(p));
-      const missingPages = rolePages.filter(p => !user.visiblePages.includes(p));
+      const allPages = getAllPages();
       
-      if (missingPerms.length > 0 || missingPages.length > 0) {
+      // Update permissions
+      const missingPerms = rolePerms.filter(p => !user.permissions.includes(p));
+      if (missingPerms.length > 0) {
         user.permissions = rolePerms;
-        user.visiblePages = rolePages;
+        updated = true;
+      }
+      
+      // Update visible pages - ensure all new pages are included
+      const missingPages = allPages.filter(p => !user.visiblePages.includes(p));
+      if (missingPages.length > 0) {
+        user.visiblePages = allPages;
         updated = true;
       }
     });
     
     if (updated) {
       setCollection('users', users);
+      console.log('✅ User permissions and pages updated');
     }
   }
   
@@ -647,7 +655,40 @@ export function getAllPermissions(): string[] {
 }
 
 export function getAllPages(): string[] {
-  return ['dashboard', 'sales', 'invoices', 'proformas', 'customers', 'products', 'inventory', 'purchases', 'suppliers', 'repairs', 'payments', 'reports', 'users', 'settings', 'backup', 'financial', 'cashbank', 'expenses', 'financialreports', 'chartofaccounts', 'generalledger', 'checks', 'transfers', 'customeraccounts', 'supplieraccounts'];
+  return [
+    'dashboard', 
+    'sales', 
+    'invoices', 
+    'proformas', 
+    'customers', 
+    'products', 
+    'inventory', 
+    'purchases', 
+    'suppliers', 
+    'repairs', 
+    'payments', 
+    'reports', 
+    'users', 
+    'settings', 
+    'backup', 
+    'financial', 
+    'cashbank', 
+    'expenses', 
+    'financialreports', 
+    'chartofaccounts', 
+    'generalledger', 
+    'checks', 
+    'transfers', 
+    'customeraccounts', 
+    'supplieraccounts',
+    'salescharts',
+    'profile',
+    'printsettings',
+    'printhistory',
+    'apistatus',
+    'migration',
+    'comprehensivereport'
+  ];
 }
 
 export function getRolePermissions(role: string): string[] {

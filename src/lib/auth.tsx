@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { db, hashPassword, verifyPassword, User, Session, type Settings, getRolePermissions, getRolePages } from './db';
+import { db, hashPassword, verifyPassword, User, Session, type Settings, getRolePermissions, getRolePages, getAllPages } from './db';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AuthState {
@@ -268,7 +268,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = useCallback(() => {
     if (authState.user) {
       const user = db.getUser(authState.user.id);
-      if (user) setAuthState(prev => ({ ...prev, user }));
+      if (user) {
+        // Ensure user has all latest pages
+        const allPages = getAllPages();
+        const missingPages = allPages.filter(p => !user.visiblePages.includes(p));
+        if (missingPages.length > 0) {
+          user.visiblePages = allPages;
+          db.saveUser(user);
+        }
+        setAuthState(prev => ({ ...prev, user }));
+      }
     }
   }, [authState.user]);
 
