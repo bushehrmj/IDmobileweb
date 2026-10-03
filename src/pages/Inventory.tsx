@@ -16,7 +16,7 @@ import Input from '../components/ui/Input';
 import { 
   Package, ArrowDown, ArrowUp, Search, Filter, 
   Download, Printer, Plus, X, TrendingUp, AlertTriangle,
-  History, Edit, Eye, BarChart3, Calendar
+  History, Edit, Eye, BarChart3, Calendar, CheckCircle
 } from 'lucide-react';
 
 export default function Inventory() {
@@ -42,6 +42,21 @@ export default function Inventory() {
     newStock: 0,
     reason: '',
   });
+
+  // Stocktaking (انبارگردانی)
+  const [showStocktaking, setShowStocktaking] = useState(false);
+  const [stocktakingMode, setStocktakingMode] = useState<'full' | 'category' | 'product'>('full');
+  const [stocktakingCategory, setStocktakingCategory] = useState('all');
+  const [stocktakingProducts, setStocktakingProducts] = useState<Array<{
+    productId: string;
+    productName: string;
+    systemStock: number;
+    actualStock: number;
+    difference: number;
+    reason: string;
+    checked: boolean;
+  }>>([]);
+  const [stocktakingStep, setStocktakingStep] = useState<'select' | 'count' | 'review' | 'complete'>('select');
 
   const products = db.getProducts();
   const movements = db.getStockMovements();
@@ -73,6 +88,113 @@ export default function Inventory() {
   }).reverse();
 
   const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+
+  // توابع انبارگردانی
+  const startStocktaking = () => {
+    let productsToCount = products;
+    
+    if (stocktakingMode === 'category' && stocktakingCategory !== 'all') {
+      productsToCount = products.filter(p => p.category === stocktakingCategory);
+    }
+    
+    const initialList = productsToCount.map(p => ({
+      productId: p.id,
+      productName: p.name,
+      systemStock: p.stock,
+      actualStock: p.stock,
+      difference: 0,
+      reason: '',
+      checked: false,
+    }));
+    
+    setStocktakingProducts(initialList);
+    setStocktakingStep('count');
+  };
+
+  const updateStocktakingProduct = (productId: string, actualStock: number, reason: string) => {
+    setStocktakingProducts(prev => 
+      prev.map(p => {
+        if (p.productId === productId) {
+          const difference = actualStock - p.systemStock;
+          return {
+            ...p,
+            actualStock,
+            difference,
+            reason,
+            checked: true,
+          };
+        }
+        return p;
+      })
+    );
+  };
+
+  const applyStocktakingResults = () => {
+    const discrepancies = stocktakingProducts.filter(p => p.difference !== 0);
+    
+    if (discrepancies.length === 0) {
+      showToast('success', 'انبارگردانی کامل شد - هیچ مغایرتی یافت نشد');
+      setShowStocktaking(false);
+      resetStocktaking();
+      return;
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    discrepancies.forEach(item => {
+      try {
+        recordStockMovement(
+          item.productId,
+          item.productName,
+          'adjustment',
+          item.actualStock,
+          'انبارگردانی',
+          'adjustment',
+          '',
+          user?.id || '',
+          user?.fullName || '',
+          item.reason || `مغایرت انبارگردانی: ${item.difference > 0 ? '+' : ''}${item.difference}`
+        );
+        successCount++;
+      } catch (error: any) {
+        console.error(`Error adjusting ${item.productName}:`, error);
+        errorCount++;
+      }
+    });
+
+    if (errorCount === 0) {
+      showToast('success', `انبارگردانی با موفقیت انجام شد - ${successCount} کالا اصلاح شد`);
+    } else {
+      showToast('warning', `انبارگردانی انجام شد - ${successCount} موفق، ${errorCount} خطا`);
+    }
+
+    setShowStocktaking(false);
+    resetStocktaking();
+  };
+
+  const resetStocktaking = () => {
+    setStocktakingMode('full');
+    setStocktakingCategory('all');
+    setStocktakingProducts([]);
+    setStocktakingStep('select');
+  };
+
+  const getStocktakingSummary = () => {
+    const total = stocktakingProducts.length;
+    const checked = stocktakingProducts.filter(p => p.checked).length;
+    const discrepancies = stocktakingProducts.filter(p => p.difference !== 0);
+    const positive = discrepancies.filter(p => p.difference > 0);
+    const negative = discrepancies.filter(p => p.difference < 0);
+    
+    return {
+      total,
+      checked,
+      discrepancies: discrepancies.length,
+      positive: positive.length,
+      negative: negative.length,
+    };
+  };
 
   const handleAdjustStock = () => {
     if (!adjustForm.productId) {
@@ -200,10 +322,16 @@ export default function Inventory() {
         </div>
         <div className="flex gap-2">
           {hasPermission('inventory.adjust') && (
-            <Button variant="primary" onClick={() => setShowAdjust(true)}>
-              <Edit size={18} />
-              اصلاح موجودی
-            </Button>
+            <>
+              <Button variant="success" onClick={() => setShowStocktaking(true)}>
+                <Package size={18} />
+                انبارگردانی
+              </Button>
+              <Button variant="primary" onClick={() => setShowAdjust(true)}>
+                <Edit size={18} />
+                اصلاح موجودی
+              </Button>
+            </>
           )}
           <Button variant="outline" onClick={() => window.print()}>
             <Printer size={18} />
@@ -651,6 +779,384 @@ export default function Inventory() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stocktaking Modal */}
+      {showStocktaking && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col animate-scaleIn">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                  <Package size={28} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">انبارگردانی</h3>
+                  <p className="text-sm text-white/80">شمارش و تطبیق موجودی واقعی با سیستم</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setShowStocktaking(false); resetStocktaking(); }} 
+                className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Progress Bar */}
+              <div className="px-5 py-3 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  مرحله {stocktakingStep === 'select' ? '۱' : stocktakingStep === 'count' ? '۲' : stocktakingStep === 'review' ? '۳' : '۴'} از ۴
+                </span>                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  {stocktakingStep === 'select' && 'انتخاب محدوده'}
+                  {stocktakingStep === 'count' && 'شمارش موجودی'}
+                  {stocktakingStep === 'review' && 'بررسی مغایرت‌ها'}
+                  {stocktakingStep === 'complete' && 'تکمیل انبارگردانی'}
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-500"
+                  style={{ width: stocktakingStep === 'select' ? '25%' : stocktakingStep === 'count' ? '50%' : stocktakingStep === 'review' ? '75%' : '100%' }}
+                />
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {/* Step 1: Select */}
+              {stocktakingStep === 'select' && (
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-4">انتخاب محدوده انبارگردانی</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <button
+                        onClick={() => setStocktakingMode('full')}
+                        className={`p-6 rounded-xl border-2 transition-all ${
+                          stocktakingMode === 'full'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-blue-300'
+                        }`}
+                      >
+                        <Package size={32} className={`mx-auto mb-3 ${stocktakingMode === 'full' ? 'text-blue-600' : 'text-slate-400'}`} />
+                        <p className="font-bold text-center text-slate-900 dark:text-white">انبارگردانی کامل</p>
+                        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">شمارش تمام کالاها</p>
+                      </button>
+
+                      <button
+                        onClick={() => setStocktakingMode('category')}
+                        className={`p-6 rounded-xl border-2 transition-all ${
+                          stocktakingMode === 'category'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-blue-300'
+                        }`}
+                      >
+                        <Filter size={32} className={`mx-auto mb-3 ${stocktakingMode === 'category' ? 'text-blue-600' : 'text-slate-400'}`} />
+                        <p className="font-bold text-center text-slate-900 dark:text-white">بر اساس دسته‌بندی</p>
+                        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">شمارش یک دسته خاص</p>
+                      </button>
+
+                      <button
+                        onClick={() => setStocktakingMode('product')}
+                        className={`p-6 rounded-xl border-2 transition-all ${
+                          stocktakingMode === 'product'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-blue-300'
+                        }`}
+                      >
+                        <Search size={32} className={`mx-auto mb-3 ${stocktakingMode === 'product' ? 'text-blue-600' : 'text-slate-400'}`} />
+                        <p className="font-bold text-center text-slate-900 dark:text-white">کالای خاص</p>
+                        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">شمارش کالاهای انتخابی</p>
+                      </button>
+                    </div>
+
+                    {stocktakingMode === 'category' && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">انتخاب دسته‌بندی</label>
+                        <select
+                          value={stocktakingCategory}
+                          onChange={e => setStocktakingCategory(e.target.value)}
+                          className="input"
+                        >
+                          <option value="all">همه دسته‌ها</option>
+                          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                    )}
+
+                    {stocktakingMode === 'product' && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">جستجوی کالا</label>
+                        <input
+                          type="text"
+                          placeholder="نام کالا را جستجو کنید..."
+                          className="input"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-2 border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle size={20} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-blue-800 dark:text-blue-300">
+                        <p className="font-bold mb-1">راهنمای انبارگردانی</p>
+                        <ul className="list-disc list-inside space-y-1 text-xs">
+                          <li>موجودی واقعی کالاها را شمارش کنید</li>
+                          <li>مغایرت‌ها را با دلیل ثبت کنید</li>
+                          <li>پس از تأیید، موجودی سیستم به‌روزرسانی می‌شود</li>
+                          <li>تمام تغییرات در تاریخچه انبار ثبت خواهند شد</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Count */}
+              {stocktakingStep === 'count' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-bold text-slate-900 dark:text-white">شمارش موجودی</h4>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      {stocktakingProducts.filter(p => p.checked).length} از {stocktakingProducts.length} کالا شمارش شده
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>کالا</th>
+                          <th className="text-center">موجودی سیستم</th>
+                          <th className="text-center">موجودی واقعی</th>
+                          <th className="text-center">مغایرت</th>
+                          <th>دلیل مغایرت</th>
+                          <th className="text-center">وضعیت</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stocktakingProducts.map(item => (
+                          <tr key={item.productId} className={item.difference !== 0 ? 'bg-amber-50 dark:bg-amber-900/10' : ''}>
+                            <td className="font-medium">{item.productName}</td>
+                            <td className="text-center font-bold text-blue-600">{item.systemStock}</td>
+                            <td className="text-center">
+                              <input
+                                type="number"
+                                value={item.actualStock}
+                                onChange={e => updateStocktakingProduct(
+                                  item.productId,
+                                  Number(e.target.value),
+                                  item.reason
+                                )}
+                                className="input w-20 text-center"
+                                min="0"
+                              />
+                            </td>
+                            <td className={`text-center font-bold ${
+                              item.difference === 0 ? 'text-green-600' :
+                              item.difference > 0 ? 'text-blue-600' : 'text-red-600'
+                            }`}>
+                              {item.difference > 0 ? '+' : ''}{item.difference}
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                value={item.reason}
+                                onChange={e => updateStocktakingProduct(
+                                  item.productId,
+                                  item.actualStock,
+                                  e.target.value
+                                )}
+                                className="input"
+                                placeholder="دلیل مغایرت..."
+                                disabled={item.difference === 0}
+                              />
+                            </td>
+                            <td className="text-center">
+                              {item.checked ? (
+                                <span className="badge badge-success">✓ شمارش شده</span>
+                              ) : (
+                                <span className="badge badge-warning">در انتظار</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Review */}
+              {stocktakingStep === 'review' && (
+                <div className="space-y-6">
+                  <h4 className="text-lg font-bold text-slate-900 dark:text-white">بررسی مغایرت‌ها</h4>
+
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="card p-4 text-center">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">کل کالاها</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{getStocktakingSummary().total}</p>
+                    </div>
+                    <div className="card p-4 text-center">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">شمارش شده</p>
+                      <p className="text-2xl font-bold text-blue-600">{getStocktakingSummary().checked}</p>
+                    </div>
+                    <div className="card p-4 text-center">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">مغایرت</p>
+                      <p className="text-2xl font-bold text-amber-600">{getStocktakingSummary().discrepancies}</p>
+                    </div>
+                    <div className="card p-4 text-center">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">افزایش</p>
+                      <p className="text-2xl font-bold text-green-600">+{getStocktakingSummary().positive}</p>
+                    </div>
+                    <div className="card p-4 text-center">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">کاهش</p>
+                      <p className="text-2xl font-bold text-red-600">-{getStocktakingSummary().negative}</p>
+                    </div>
+                  </div>
+
+                  {/* Discrepancies List */}
+                  {stocktakingProducts.filter(p => p.difference !== 0).length > 0 && (
+                    <div>
+                      <h5 className="font-bold text-slate-900 dark:text-white mb-3">لیست مغایرت‌ها</h5>
+                      <div className="overflow-x-auto">
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th>کالا</th>
+                              <th className="text-center">سیستم</th>
+                              <th className="text-center">واقعی</th>
+                              <th className="text-center">مغایرت</th>
+                              <th>دلیل</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stocktakingProducts.filter(p => p.difference !== 0).map(item => (
+                              <tr key={item.productId} className={item.difference > 0 ? 'bg-green-50 dark:bg-green-900/10' : 'bg-red-50 dark:bg-red-900/10'}>
+                                <td className="font-medium">{item.productName}</td>
+                                <td className="text-center">{item.systemStock}</td>
+                                <td className="text-center">{item.actualStock}</td>
+                                <td className={`text-center font-bold ${item.difference > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {item.difference > 0 ? '+' : ''}{item.difference}
+                                </td>
+                                <td className="text-sm">{item.reason || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {stocktakingProducts.filter(p => p.difference !== 0).length === 0 && (
+                    <div className="text-center py-12">
+                      <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle size={40} className="text-green-600" />
+                      </div>
+                      <p className="text-lg font-bold text-green-600 mb-2">تبریک!</p>
+                      <p className="text-slate-600 dark:text-slate-400">هیچ مغایرتی یافت نشد. موجودی سیستم با موجودی واقعی مطابقت دارد.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 4: Complete */}
+              {stocktakingStep === 'complete' && (
+                <div className="text-center py-12">
+                  <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                    <CheckCircle size={48} className="text-white" />
+                  </div>
+                  <h4 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">انبارگردانی با موفقیت انجام شد!</h4>
+                  <p className="text-slate-600 dark:text-slate-400 mb-6">
+                    {stocktakingProducts.filter(p => p.difference !== 0).length} مغایرت اصلاح شد
+                  </p>
+                  <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">کل کالاها</p>
+                      <p className="text-2xl font-bold text-blue-600">{getStocktakingSummary().total}</p>
+                    </div>
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">مغایرت‌ها</p>
+                      <p className="text-2xl font-bold text-amber-600">{getStocktakingSummary().discrepancies}</p>
+                    </div>
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">اصلاح شده</p>
+                      <p className="text-2xl font-bold text-green-600">{getStocktakingSummary().discrepancies}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
+              <div>
+                {stocktakingStep !== 'select' && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setStocktakingStep(
+                      stocktakingStep === 'count' ? 'select' : 
+                      stocktakingStep === 'review' ? 'count' : 'review'
+                    )}
+                  >
+                    مرحله قبل
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => { setShowStocktaking(false); resetStocktaking(); }}
+                >
+                  انصراف
+                </Button>
+                
+                {stocktakingStep === 'select' && (
+                  <Button variant="primary" onClick={startStocktaking}>
+                    شروع انبارگردانی
+                  </Button>
+                )}
+                
+                {stocktakingStep === 'count' && (
+                  <Button 
+                    variant="primary" 
+                    onClick={() => setStocktakingStep('review')}
+                    disabled={stocktakingProducts.filter(p => p.checked).length === 0}
+                  >
+                    بررسی مغایرت‌ها
+                  </Button>
+                )}
+                
+                {stocktakingStep === 'review' && (
+                  <Button 
+                    variant="success" 
+                    onClick={() => {
+                      applyStocktakingResults();
+                      setStocktakingStep('complete');
+                    }}
+                  >
+                    <CheckCircle size={18} />
+                    تأیید و اعمال اصلاحات
+                  </Button>
+                )}
+                
+                {stocktakingStep === 'complete' && (
+                  <Button 
+                    variant="primary" 
+                    onClick={() => { setShowStocktaking(false); resetStocktaking(); }}
+                  >
+                    پایان
+                  </Button>
+                )}
               </div>
             </div>
           </div>
