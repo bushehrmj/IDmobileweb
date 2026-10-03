@@ -582,13 +582,392 @@ app.post('/api/customers', authenticateToken, checkPermission('customers.create'
   }
 });
 
-// Sales Routes
-app.get('/api/sales', authenticateToken, (req, res) => {
+// Products - Update
+app.put('/api/products/:id', authenticateToken, checkPermission('products.edit'), (req, res) => {
   try {
-    const sales = queryAll('SELECT * FROM sales ORDER BY created_at DESC');
-    res.json(sales);
+    const now = new Date().toISOString();
+    
+    db.run(
+      `UPDATE products SET name = ?, brand = ?, model = ?, category = ?, sku = ?, barcode = ?, 
+       imei_required = ?, serial_required = ?, color = ?, storage = ?, description = ?, 
+       buy_price = ?, sell_price = ?, min_stock = ?, stock = ?, status = ?, 
+       dollar_rate_at_purchase = ?, updated_at = ?
+       WHERE id = ?`,
+      [
+        req.body.name, req.body.brand || '', req.body.model || '', req.body.category || '',
+        req.body.sku || '', req.body.barcode || '', req.body.imeiRequired ? 1 : 0,
+        req.body.serialRequired ? 1 : 0, req.body.color || '', req.body.storage || '',
+        req.body.description || '', req.body.buyPrice || 0, req.body.sellPrice || 0,
+        req.body.minStock || 0, req.body.stock || 0, req.body.status || 'active',
+        req.body.dollarRateAtPurchase || null, now, req.params.id
+      ]
+    );
+
+    saveDatabase();
+    res.json({ message: 'Product updated successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch sales' });
+    console.error('Update product error:', error);
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+// Products - Delete
+app.delete('/api/products/:id', authenticateToken, checkPermission('products.delete'), (req, res) => {
+  try {
+    db.run('DELETE FROM products WHERE id = ?', [req.params.id]);
+    saveDatabase();
+    res.json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Delete product error:', error);
+    res.status(500).json({ error: 'Failed to delete product' });
+  }
+});
+
+// Product Serials - Get
+app.get('/api/products/:id/serials', authenticateToken, (req, res) => {
+  try {
+    const serials = queryAll('SELECT * FROM product_serials WHERE product_id = ?', [req.params.id]);
+    res.json(serials);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch serials' });
+  }
+});
+
+// Product Serials - Create
+app.post('/api/products/:id/serials', authenticateToken, checkPermission('products.edit'), (req, res) => {
+  try {
+    const id = uuidv4();
+    
+    db.run(
+      `INSERT INTO product_serials (id, product_id, imei1, imei2, serial, status, purchase_id, sale_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.params.id, req.body.imei1 || '', req.body.imei2 || '',
+        req.body.serial || '', req.body.status || 'available',
+        req.body.purchaseId || null, req.body.saleId || null, new Date().toISOString()
+      ]
+    );
+
+    saveDatabase();
+    res.json({ id, message: 'Serial created successfully' });
+  } catch (error) {
+    console.error('Create serial error:', error);
+    res.status(500).json({ error: 'Failed to create serial' });
+  }
+});
+
+// Customers - Update
+app.put('/api/customers/:id', authenticateToken, checkPermission('customers.edit'), (req, res) => {
+  try {
+    db.run(
+      `UPDATE customers SET first_name = ?, last_name = ?, mobile = ?, national_id = ?, 
+       address = ?, notes = ?, total_purchase = ?, total_paid = ?, debt = ?, 
+       invoice_count = ?, last_purchase = ?
+       WHERE id = ?`,
+      [
+        req.body.firstName, req.body.lastName || '', req.body.mobile || '',
+        req.body.nationalId || '', req.body.address || '', req.body.notes || '',
+        req.body.totalPurchase || 0, req.body.totalPaid || 0, req.body.debt || 0,
+        req.body.invoiceCount || 0, req.body.lastPurchase || null, req.params.id
+      ]
+    );
+
+    saveDatabase();
+    res.json({ message: 'Customer updated successfully' });
+  } catch (error) {
+    console.error('Update customer error:', error);
+    res.status(500).json({ error: 'Failed to update customer' });
+  }
+});
+
+// Customers - Delete
+app.delete('/api/customers/:id', authenticateToken, checkPermission('customers.edit'), (req, res) => {
+  try {
+    db.run('DELETE FROM customers WHERE id = ?', [req.params.id]);
+    saveDatabase();
+    res.json({ message: 'Customer deleted successfully' });
+  } catch (error) {
+    console.error('Delete customer error:', error);
+    res.status(500).json({ error: 'Failed to delete customer' });
+  }
+});
+
+// Sales - Create
+app.post('/api/sales', authenticateToken, checkPermission('sales.create'), (req, res) => {
+  try {
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    
+    db.run(
+      `INSERT INTO sales (id, invoice_number, date, time, customer_id, customer_name, seller_id, seller_name,
+       subtotal, discount, discount_type, tax, total, paid, remaining, payment_method, status, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.body.invoiceNumber, req.body.date, req.body.time,
+        req.body.customerId, req.body.customerName, req.body.sellerId, req.body.sellerName,
+        req.body.subtotal || 0, req.body.discount || 0, req.body.discountType || 'amount',
+        req.body.tax || 0, req.body.total || 0, req.body.paid || 0, req.body.remaining || 0,
+        req.body.paymentMethod || 'cash', req.body.status || 'completed', req.body.notes || '', now
+      ]
+    );
+
+    // Insert sale items
+    if (req.body.items && req.body.items.length > 0) {
+      req.body.items.forEach(item => {
+        const itemId = uuidv4();
+        db.run(
+          `INSERT INTO sale_items (id, sale_id, product_id, product_name, brand, model, barcode, 
+           imei1, imei2, quantity, buy_price, sell_price, discount, total)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            itemId, id, item.productId, item.productName, item.brand || '', item.model || '',
+            item.barcode || '', item.imei1 || '', item.imei2 || '', item.quantity || 1,
+            item.buyPrice || 0, item.sellPrice || 0, item.discount || 0, item.total || 0
+          ]
+        );
+      });
+    }
+
+    saveDatabase();
+    res.json({ id, message: 'Sale created successfully' });
+  } catch (error) {
+    console.error('Create sale error:', error);
+    res.status(500).json({ error: 'Failed to create sale' });
+  }
+});
+
+// Sales - Update
+app.put('/api/sales/:id', authenticateToken, checkPermission('sales.edit'), (req, res) => {
+  try {
+    db.run(
+      `UPDATE sales SET subtotal = ?, discount = ?, discount_type = ?, tax = ?, total = ?, 
+       paid = ?, remaining = ?, payment_method = ?, status = ?, notes = ?
+       WHERE id = ?`,
+      [
+        req.body.subtotal || 0, req.body.discount || 0, req.body.discountType || 'amount',
+        req.body.tax || 0, req.body.total || 0, req.body.paid || 0, req.body.remaining || 0,
+        req.body.paymentMethod || 'cash', req.body.status || 'completed', req.body.notes || '',
+        req.params.id
+      ]
+    );
+
+    saveDatabase();
+    res.json({ message: 'Sale updated successfully' });
+  } catch (error) {
+    console.error('Update sale error:', error);
+    res.status(500).json({ error: 'Failed to update sale' });
+  }
+});
+
+// Sales - Delete (Cancel)
+app.delete('/api/sales/:id', authenticateToken, checkPermission('sales.cancel'), (req, res) => {
+  try {
+    // Update status to cancelled instead of deleting
+    db.run('UPDATE sales SET status = ? WHERE id = ?', ['cancelled', req.params.id]);
+    saveDatabase();
+    res.json({ message: 'Sale cancelled successfully' });
+  } catch (error) {
+    console.error('Cancel sale error:', error);
+    res.status(500).json({ error: 'Failed to cancel sale' });
+  }
+});
+
+// Repairs Routes
+app.get('/api/repairs', authenticateToken, (req, res) => {
+  try {
+    const repairs = queryAll('SELECT * FROM repairs ORDER BY created_at DESC');
+    res.json(repairs);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch repairs' });
+  }
+});
+
+app.post('/api/repairs', authenticateToken, checkPermission('repairs.create'), (req, res) => {
+  try {
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    
+    db.run(
+      `INSERT INTO repairs (id, ticket_number, customer_name, customer_mobile, device, brand, model,
+       imei, serial, color, physical_condition, accessories, device_password, reported_issue, diagnosis,
+       parts, labor, parts_cost, extra_cost, total_cost, paid, remaining, technician_id, technician_name,
+       status, entry_date, delivery_date, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.body.ticketNumber, req.body.customerName, req.body.customerMobile || '',
+        req.body.device, req.body.brand || '', req.body.model || '', req.body.imei || '',
+        req.body.serial || '', req.body.color || '', req.body.physicalCondition || '',
+        req.body.accessories || '', req.body.devicePassword || '', req.body.reportedIssue || '',
+        req.body.diagnosis || '', JSON.stringify(req.body.parts || []), req.body.labor || 0,
+        req.body.partsCost || 0, req.body.extraCost || 0, req.body.totalCost || 0,
+        req.body.paid || 0, req.body.remaining || 0, req.body.technicianId || '',
+        req.body.technicianName || '', req.body.status || 'received', req.body.entryDate || now,
+        req.body.deliveryDate || null, req.body.notes || '', now
+      ]
+    );
+
+    saveDatabase();
+    res.json({ id, message: 'Repair created successfully' });
+  } catch (error) {
+    console.error('Create repair error:', error);
+    res.status(500).json({ error: 'Failed to create repair' });
+  }
+});
+
+app.put('/api/repairs/:id', authenticateToken, checkPermission('repairs.edit'), (req, res) => {
+  try {
+    db.run(
+      `UPDATE repairs SET customer_name = ?, customer_mobile = ?, device = ?, brand = ?, model = ?,
+       imei = ?, serial = ?, color = ?, physical_condition = ?, accessories = ?, device_password = ?,
+       reported_issue = ?, diagnosis = ?, parts = ?, labor = ?, parts_cost = ?, extra_cost = ?,
+       total_cost = ?, paid = ?, remaining = ?, technician_id = ?, technician_name = ?, status = ?,
+       entry_date = ?, delivery_date = ?, notes = ?
+       WHERE id = ?`,
+      [
+        req.body.customerName, req.body.customerMobile || '', req.body.device,
+        req.body.brand || '', req.body.model || '', req.body.imei || '', req.body.serial || '',
+        req.body.color || '', req.body.physicalCondition || '', req.body.accessories || '',
+        req.body.devicePassword || '', req.body.reportedIssue || '', req.body.diagnosis || '',
+        JSON.stringify(req.body.parts || []), req.body.labor || 0, req.body.partsCost || 0,
+        req.body.extraCost || 0, req.body.totalCost || 0, req.body.paid || 0,
+        req.body.remaining || 0, req.body.technicianId || '', req.body.technicianName || '',
+        req.body.status || 'received', req.body.entryDate, req.body.deliveryDate || null,
+        req.body.notes || '', req.params.id
+      ]
+    );
+
+    saveDatabase();
+    res.json({ message: 'Repair updated successfully' });
+  } catch (error) {
+    console.error('Update repair error:', error);
+    res.status(500).json({ error: 'Failed to update repair' });
+  }
+});
+
+// Stock Movements Routes
+app.get('/api/stock-movements', authenticateToken, (req, res) => {
+  try {
+    const movements = queryAll('SELECT * FROM stock_movements ORDER BY date DESC');
+    res.json(movements);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch stock movements' });
+  }
+});
+
+app.post('/api/stock-movements', authenticateToken, checkPermission('inventory.adjust'), (req, res) => {
+  try {
+    const id = uuidv4();
+    
+    db.run(
+      `INSERT INTO stock_movements (id, product_id, product_name, type, quantity, reference, 
+       reference_type, reference_id, user_id, user_name, date, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.body.productId, req.body.productName, req.body.type, req.body.quantity,
+        req.body.reference || '', req.body.referenceType || '', req.body.referenceId || '',
+        req.body.userId || '', req.body.userName || '', new Date().toISOString(), req.body.notes || ''
+      ]
+    );
+
+    saveDatabase();
+    res.json({ id, message: 'Stock movement created successfully' });
+  } catch (error) {
+    console.error('Create stock movement error:', error);
+    res.status(500).json({ error: 'Failed to create stock movement' });
+  }
+});
+
+// Purchases Routes
+app.get('/api/purchases', authenticateToken, (req, res) => {
+  try {
+    const purchases = queryAll('SELECT * FROM purchases ORDER BY created_at DESC');
+    res.json(purchases);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch purchases' });
+  }
+});
+
+app.post('/api/purchases', authenticateToken, checkPermission('purchases.create'), (req, res) => {
+  try {
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    
+    db.run(
+      `INSERT INTO purchases (id, invoice_number, date, supplier_id, supplier_name, subtotal, 
+       total, paid, remaining, dollar_rate, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.body.invoiceNumber, req.body.date, req.body.supplierId || '',
+        req.body.supplierName, req.body.subtotal || 0, req.body.total || 0,
+        req.body.paid || 0, req.body.remaining || 0, req.body.dollarRate || 0,
+        req.body.notes || '', now
+      ]
+    );
+
+    // Insert purchase items
+    if (req.body.items && req.body.items.length > 0) {
+      req.body.items.forEach(item => {
+        const itemId = uuidv4();
+        db.run(
+          `INSERT INTO purchase_items (id, purchase_id, product_id, product_name, quantity, buy_price, total, imeis)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            itemId, id, item.productId, item.productName, item.quantity || 1,
+            item.buyPrice || 0, item.total || 0, JSON.stringify(item.imeis || [])
+          ]
+        );
+      });
+    }
+
+    saveDatabase();
+    res.json({ id, message: 'Purchase created successfully' });
+  } catch (error) {
+    console.error('Create purchase error:', error);
+    res.status(500).json({ error: 'Failed to create purchase' });
+  }
+});
+
+// Payments Routes
+app.get('/api/payments', authenticateToken, (req, res) => {
+  try {
+    const payments = queryAll('SELECT * FROM payments ORDER BY date DESC');
+    res.json(payments);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch payments' });
+  }
+});
+
+app.post('/api/payments', authenticateToken, checkPermission('financial.expenses'), (req, res) => {
+  try {
+    const id = uuidv4();
+    
+    db.run(
+      `INSERT INTO payments (id, customer_id, customer_name, type, amount, method, reference, 
+       reference_type, reference_id, user_id, date, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.body.customerId || '', req.body.customerName, req.body.type,
+        req.body.amount, req.body.method || 'cash', req.body.reference || '',
+        req.body.referenceType || '', req.body.referenceId || '', req.body.userId || '',
+        new Date().toISOString(), req.body.notes || ''
+      ]
+    );
+
+    saveDatabase();
+    res.json({ id, message: 'Payment created successfully' });
+  } catch (error) {
+    console.error('Create payment error:', error);
+    res.status(500).json({ error: 'Failed to create payment' });
+  }
+});
+
+// Audit Logs Routes
+app.get('/api/audit-logs', authenticateToken, (req, res) => {
+  try {
+    const logs = queryAll('SELECT * FROM audit_logs ORDER BY date DESC LIMIT 100');
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
   }
 });
 
