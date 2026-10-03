@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Users, Package, Warehouse,
   Truck, Wrench, CreditCard, BarChart3, UserCog, Settings as SettingsIcon,
   Database, LogOut, Menu, X, Search, Bell, Moon, Sun, ChevronDown, ChevronLeft,
-  DollarSign, BookOpen, ArrowRightLeft, FileText, Wallet, PieChart, Plus, User, Printer
+  DollarSign, BookOpen, ArrowRightLeft, FileText, Wallet, PieChart, Plus, User, Printer, Server
 } from 'lucide-react';
 import GlobalSearch from './GlobalSearch';
 import QuickActions from './QuickActions';
@@ -54,6 +54,7 @@ const menuItems: MenuItem[] = [
   { id: 'settings', label: 'تنظیمات', icon: SettingsIcon, permission: 'settings.view' },
   { id: 'printsettings', label: 'تنظیمات چاپ', icon: Printer, permission: 'settings.view' },
   { id: 'printhistory', label: 'تاریخچه چاپ', icon: FileText, permission: 'settings.view' },
+  { id: 'apistatus', label: 'وضعیت API', icon: Server, permission: 'settings.view' },
   { id: 'backup', label: 'پشتیبان‌گیری', icon: Database, permission: 'backup.create' },
 ];
 

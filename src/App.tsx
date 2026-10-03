@@ -35,6 +35,7 @@ const SalesCharts = lazy(() => import('./pages/SalesCharts'));
 const Profile = lazy(() => import('./pages/Profile'));
 const PrintSettings = lazy(() => import('./pages/PrintSettings'));
 const PrintHistory = lazy(() => import('./pages/PrintHistory'));
+const ApiStatus = lazy(() => import('./pages/ApiStatus'));
 
 // Initialize DB
 initializeDB();
@@ -124,6 +125,7 @@ function AppContent() {
     profile: 'dashboard.view',
     printsettings: 'settings.view',
     printhistory: 'settings.view',
+    apistatus: 'settings.view',
   };
 
   const requiredPermission = pagePermissionMap[currentPage];
@@ -216,6 +218,8 @@ function AppContent() {
         return <Suspense fallback={<PageLoading />}><PrintSettings /></Suspense>;
       case 'printhistory': 
         return <Suspense fallback={<PageLoading />}><PrintHistory /></Suspense>;
+      case 'apistatus': 
+        return <Suspense fallback={<PageLoading />}><ApiStatus /></Suspense>;
       default: return <Dashboard />;
     }
   };
