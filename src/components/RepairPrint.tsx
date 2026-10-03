@@ -15,18 +15,26 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
   const settings = db.getSettings();
   const [showPrintCenter, setShowPrintCenter] = useState(false);
 
+  // اگر تعمیر پیدا نشد
   if (!repair) {
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-6 text-center">
-          <p className="text-red-500">تعمیر یافت نشد</p>
-          <button onClick={onClose} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg">بستن</button>
+          <p className="text-red-500 mb-4">تعمیر یافت نشد</p>
+          <button 
+            onClick={onClose} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            بستن
+          </button>
         </div>
       </div>
     );
   }
 
-  const handlePrint = () => setShowPrintCenter(true);
+  const handlePrint = () => {
+    setShowPrintCenter(true);
+  };
 
   // Safe accessors with defaults
   const accessoriesList: string[] = [];
@@ -51,107 +59,102 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
                           repair.deviceType || 'دستگاه';
 
   const totalCost = repair.finalTotal || repair.totalCost || 0;
-  const paid = repair.paid || 0;
-  const remaining = repair.remaining || 0;
 
   // رسید استاندارد اتحادیه
   const renderUnionReceipt = () => (
-    <div className="p-6" dir="rtl" style={{ fontFamily: 'Vazirmatn, Tahoma, Arial, sans-serif', fontSize: '11px' }}>
+    <div 
+      className="p-4 bg-white text-black" 
+      dir="rtl" 
+      style={{ 
+        fontFamily: 'Vazirmatn, Tahoma, Arial, sans-serif', 
+        fontSize: '11px',
+        lineHeight: '1.6'
+      }}
+    >
       {/* هدر اتحادیه */}
-      <div className="text-center border-2 border-black p-3 mb-4">
-        <h1 className="text-lg font-bold mb-1">مورد تایید اتحادیه</h1>
-        <h2 className="text-base font-bold">(در دو نسخه) تلفن همراه</h2>
-        <h3 className="text-sm font-bold mt-2">قبض رسید تعمیرات</h3>
+      <div className="text-center border-2 border-black p-3 mb-3">
+        <h1 className="text-base font-bold mb-1">مورد تایید اتحادیه</h1>
+        <h2 className="text-sm font-bold">(در دو نسخه) تلفن همراه</h2>
+        <h3 className="text-sm font-bold mt-1">قبض رسید تعمیرات</h3>
       </div>
 
       {/* اطلاعات فروشگاه */}
-      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+      <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
         <div>
-          <p className="font-bold">تلفن تماس: {settings.storePhone || '....................'}</p>
+          <span className="font-bold">تلفن تماس:</span> {settings.storePhone || '....................'}
         </div>
         <div className="text-left">
-          <p className="font-bold">آدرس فروشگاه: {settings.storeAddress || '....................'}</p>
+          <span className="font-bold">آدرس فروشگاه:</span> {settings.storeAddress || '....................'}
         </div>
       </div>
 
       {/* اطلاعات قبض */}
-      <div className="border-2 border-black p-3 mb-4">
-        <div className="grid grid-cols-3 gap-4 text-sm">
+      <div className="border-2 border-black p-2 mb-3">
+        <div className="grid grid-cols-3 gap-2 text-xs">
           <div>
-            <span className="font-bold">شماره قبض:</span>
-            <span className="mr-2">{repair.ticketNumber}</span>
+            <span className="font-bold">شماره قبض:</span> {repair.ticketNumber}
           </div>
           <div>
-            <span className="font-bold">تاریخ:</span>
-            <span className="mr-2">{toJalali(repair.entryDate)}</span>
+            <span className="font-bold">تاریخ:</span> {toJalali(repair.entryDate)}
           </div>
           <div>
-            <span className="font-bold">ساعت:</span>
-            <span className="mr-2">{repair.entryTime || '--:--'}</span>
+            <span className="font-bold">ساعت:</span> {repair.entryTime || '--:--'}
           </div>
         </div>
       </div>
 
       {/* اطلاعات مشتری */}
-      <div className="border-2 border-black p-3 mb-4">
-        <h4 className="font-bold mb-2 text-sm">اطلاعات مشتری</h4>
-        <div className="grid grid-cols-2 gap-3 text-xs">
+      <div className="border-2 border-black p-2 mb-3">
+        <h4 className="font-bold mb-1 text-xs">اطلاعات مشتری</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <span className="font-bold">نام و نام خانوادگی:</span>
-            <span className="mr-2 border-b border-black inline-block w-40">{repair.customerName}</span>
+            <span className="font-bold">نام و نام خانوادگی:</span> {repair.customerName}
           </div>
           <div>
-            <span className="font-bold">شماره ملی:</span>
-            <span className="mr-2 border-b border-black inline-block w-40">{repair.customerNationalId || '................'}</span>
+            <span className="font-bold">شماره ملی:</span> {repair.customerNationalId || '................'}
           </div>
           <div>
-            <span className="font-bold">شماره تلفن همراه:</span>
-            <span className="mr-2 border-b border-black inline-block w-40">{repair.customerMobile}</span>
+            <span className="font-bold">شماره تلفن همراه:</span> {repair.customerMobile}
           </div>
           <div>
-            <span className="font-bold">شماره تلفن ثابت:</span>
-            <span className="mr-2 border-b border-black inline-block w-40">................</span>
+            <span className="font-bold">شماره تلفن ثابت:</span> {repair.customerMobile2 || '................'}
           </div>
         </div>
       </div>
 
-      {/* اطلاعات دستگاه */}
-      <div className="border-2 border-black p-3 mb-4">
-        <h4 className="font-bold mb-2 text-sm">مشخصات دستگاه</h4>
-        <div className="grid grid-cols-2 gap-3 text-xs">
+      {/* مشخصات دستگاه */}
+      <div className="border-2 border-black p-2 mb-3">
+        <h4 className="font-bold mb-1 text-xs">مشخصات دستگاه</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <span className="font-bold">برند و مدل:</span>
-            <span className="mr-2 border-b border-black inline-block w-40">{repair.brand} {repair.model}</span>
+            <span className="font-bold">برند و مدل:</span> {repair.brand} {repair.model}
           </div>
           <div>
-            <span className="font-bold">رنگ:</span>
-            <span className="mr-2 border-b border-black inline-block w-40">{repair.color || '........'}</span>
+            <span className="font-bold">رنگ:</span> {repair.color || '........'}
           </div>
           <div>
-            <span className="font-bold">شماره سریال:</span>
-            <span className="mr-2 border-b border-black inline-block w-40 font-mono">{repair.serial || '................'}</span>
+            <span className="font-bold">شماره سریال:</span> {repair.serial || '................'}
           </div>
           <div>
-            <span className="font-bold">IMEI:</span>
-            <span className="mr-2 border-b border-black inline-block w-40 font-mono">{repair.imei || '................'}</span>
+            <span className="font-bold">IMEI:</span> {repair.imei || '................'}
           </div>
         </div>
       </div>
 
       {/* ایراد دستگاه */}
-      <div className="border-2 border-black p-3 mb-4">
-        <h4 className="font-bold mb-2 text-sm">ایراد اعلامی مشتری</h4>
-        <p className="text-xs min-h-[40px] border-b border-black">{repair.reportedIssue || '........................................................'}</p>
+      <div className="border-2 border-black p-2 mb-3">
+        <h4 className="font-bold mb-1 text-xs">ایراد اعلامی مشتری</h4>
+        <p className="text-xs min-h-[30px]">{repair.reportedIssue || '........................................................'}</p>
       </div>
 
       {/* وضعیت ظاهری */}
-      <div className="border-2 border-black p-3 mb-4">
-        <h4 className="font-bold mb-2 text-sm">ایرادات ظاهری دستگاه</h4>
-        <p className="text-xs min-h-[30px] border-b border-black">
+      <div className="border-2 border-black p-2 mb-3">
+        <h4 className="font-bold mb-1 text-xs">ایرادات ظاهری دستگاه</h4>
+        <p className="text-xs min-h-[20px]">
           {repair.physicalCondition ? 
             Object.entries(repair.physicalCondition)
               .filter(([key, value]) => value !== 'unknown' && value !== false)
-              .map(([key, value]) => {
+              .map(([key]) => {
                 const labels: Record<string, string> = {
                   screen: 'صفحه نمایش',
                   backCover: 'قاب پشت',
@@ -169,35 +172,29 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
       </div>
 
       {/* لوازم همراه */}
-      <div className="border-2 border-black p-3 mb-4">
-        <h4 className="font-bold mb-2 text-sm">لوازم و متعلقات همراه دستگاه</h4>
-        <p className="text-xs min-h-[30px] border-b border-black">
+      <div className="border-2 border-black p-2 mb-3">
+        <h4 className="font-bold mb-1 text-xs">لوازم و متعلقات همراه دستگاه</h4>
+        <p className="text-xs min-h-[20px]">
           {accessoriesList.length > 0 ? accessoriesList.join('، ') : '........................................................'}
         </p>
       </div>
 
       {/* هزینه و زمان */}
-      <div className="border-2 border-black p-3 mb-4">
-        <div className="grid grid-cols-2 gap-4 text-xs">
+      <div className="border-2 border-black p-2 mb-3">
+        <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <span className="font-bold">هزینه برآورد اولیه:</span>
-            <span className="mr-2 border-b border-black inline-block w-32 text-left">
-              {formatCurrency(repair.estimatedTotal || totalCost, settings.currency)}
-            </span>
+            <span className="font-bold">هزینه برآورد اولیه:</span> {formatCurrency(repair.estimatedTotal || totalCost, settings.currency)}
           </div>
           <div>
-            <span className="font-bold">زمان تقریبی تعمیر:</span>
-            <span className="mr-2 border-b border-black inline-block w-32 text-left">
-              {repair.estimatedDeliveryDate ? toJalali(repair.estimatedDeliveryDate) : '72 ساعت'}
-            </span>
+            <span className="font-bold">زمان تقریبی تعمیر:</span> {repair.estimatedDeliveryDate ? toJalali(repair.estimatedDeliveryDate) : '72 ساعت'}
           </div>
         </div>
       </div>
 
-      {/* قوانین و مقررات اتحادیه */}
-      <div className="border-2 border-black p-3 mb-4 text-xs">
-        <h4 className="font-bold mb-2">شرایط و قوانین (مورد تایید اتحادیه)</h4>
-        <ol className="list-decimal list-inside space-y-1 leading-relaxed">
+      {/* قوانین اتحادیه */}
+      <div className="border-2 border-black p-2 mb-3 text-xs">
+        <h4 className="font-bold mb-1">شرایط و قوانین (مورد تایید اتحادیه)</h4>
+        <ol className="list-decimal list-inside space-y-0.5 leading-relaxed">
           <li>دستگاه بنا به مورد تعمیر و عیب رفع شده طبق قانون دارای گارانتی می‌باشد.</li>
           <li>در صورت نیاز به فلش یا ریستور و پاک شدن اطلاعات به هنگام تعمیر، تعمیرگاه هیچگونه مسئولیتی ندارد و حفظ و نگهداری اطلاعات شخصی به عهده مالک دستگاه می‌باشد.</li>
           <li>احتمال شکستگی و از کار افتادن صفحه نمایش به هنگام تعمیر در توضیحات مکتوب می‌گردد.</li>
@@ -212,25 +209,25 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
         </ol>
       </div>
 
-      {/* توضیحات اضافی */}
-      <div className="border-2 border-black p-3 mb-4">
-        <h4 className="font-bold mb-2 text-sm">توضیحات</h4>
-        <p className="text-xs min-h-[60px] border-b border-black">
-          {repair.notes || '....................................................................................................................................................................................................................................................................................................................................................'}
+      {/* توضیحات */}
+      <div className="border-2 border-black p-2 mb-3">
+        <h4 className="font-bold mb-1 text-xs">توضیحات</h4>
+        <p className="text-xs min-h-[40px]">
+          {repair.notes || '................................................................................................................................................................'}
         </p>
       </div>
 
       {/* امضاها */}
-      <div className="border-2 border-black p-3 mb-4">
-        <div className="grid grid-cols-2 gap-8 text-xs">
+      <div className="border-2 border-black p-2 mb-3">
+        <div className="grid grid-cols-2 gap-4 text-xs">
           <div className="text-center">
-            <p className="font-bold mb-8">امضاء مشتری</p>
-            <p className="border-b border-black inline-block w-48"></p>
-            <p className="mt-2 text-[10px]">صحت موارد فوق و به صورت کتبی و شفاهی به اینجانب تفهیم و رفع ابهام گردید. اینجانب .................................... تائید می‌نمایم.</p>
+            <p className="font-bold mb-6">امضاء مشتری</p>
+            <div className="border-b border-black h-8"></div>
+            <p className="mt-1 text-[10px]">صحت موارد فوق و به صورت کتبی و شفاهی به اینجانب تفهیم و رفع ابهام گردید. اینجانب ........................ تائید می‌نمایم.</p>
           </div>
           <div className="text-center">
-            <p className="font-bold mb-8">مهر و امضاء فروشگاه</p>
-            <p className="border-b border-black inline-block w-48"></p>
+            <p className="font-bold mb-6">مهر و امضاء فروشگاه</p>
+            <div className="border-b border-black h-8"></div>
           </div>
         </div>
       </div>
@@ -243,38 +240,50 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
     </div>
   );
 
+  // محتوای رسید برای چاپ
+  const receiptContent = (
+    <div>
+      {/* نسخه اول */}
+      {renderUnionReceipt()}
+      
+      {/* خط برش */}
+      <div className="border-t-2 border-dashed border-gray-400 my-4"></div>
+      
+      {/* نسخه دوم */}
+      {renderUnionReceipt()}
+    </div>
+  );
+
   return (
     <>
+      {/* Modal پیش‌نمایش */}
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-white border-b border-slate-200 p-3 flex items-center justify-between no-print z-10">
-            <h3 className="font-bold">
+        <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="sticky top-0 bg-white border-b border-slate-200 p-3 flex items-center justify-between z-10">
+            <h3 className="font-bold text-lg">
               {type === 'receipt' ? `قبض رسید تعمیرات #${repair.ticketNumber}` : `فاکتور تعمیر #${repair.ticketNumber}`}
             </h3>
             <div className="flex gap-2">
-              <button onClick={handlePrint} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1">
-                <Printer size={14} /> چاپ حرفه‌ای
+              <button 
+                onClick={handlePrint} 
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-1 hover:bg-blue-700"
+              >
+                <Printer size={16} />
+                چاپ
               </button>
-              <button onClick={onClose} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded">
+              <button 
+                onClick={onClose} 
+                className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+              >
                 <X size={20} />
               </button>
             </div>
           </div>
 
-          {/* دو نسخه از رسید */}
-          <div className="print-two-copies">
-            {/* نسخه اول */}
-            <div className="receipt-copy">
-              {renderUnionReceipt()}
-            </div>
-
-            {/* خط برش */}
-            <div className="border-t-2 border-dashed border-gray-400 my-4 print:my-8"></div>
-
-            {/* نسخه دوم */}
-            <div className="receipt-copy">
-              {renderUnionReceipt()}
-            </div>
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-4 bg-slate-100">
+            {receiptContent}
           </div>
         </div>
       </div>
@@ -284,17 +293,7 @@ export default function RepairPrint({ repairId, type, onClose }: RepairPrintProp
         <PrintCenter
           isOpen={showPrintCenter}
           onClose={() => setShowPrintCenter(false)}
-          content={
-            <div className="print-two-copies">
-              <div className="receipt-copy">
-                {renderUnionReceipt()}
-              </div>
-              <div className="border-t-2 border-dashed border-gray-400 my-4"></div>
-              <div className="receipt-copy">
-                {renderUnionReceipt()}
-              </div>
-            </div>
-          }
+          content={receiptContent}
           documentType="repair-receipt"
           documentTitle={`قبض رسید تعمیرات ${repair.ticketNumber}`}
         />
