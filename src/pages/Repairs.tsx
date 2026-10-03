@@ -7,7 +7,8 @@ import {
   Plus, Search, Edit, Printer, Wrench, X, Filter,
   CheckCircle, Clock, AlertCircle, XCircle, Eye,
   Phone, Calendar, DollarSign, User, Smartphone,
-  ChevronRight, MoreVertical, MessageSquare
+  ChevronRight, MoreVertical, MessageSquare, TrendingUp,
+  Activity, Award, Target, Zap, BarChart3, PieChart
 } from 'lucide-react';
 import RepairForm from '../components/RepairForm';
 import RepairPrint from '../components/RepairPrint';
@@ -40,6 +41,20 @@ const statusColors: Record<string, string> = {
   not_repairable: 'bg-gray-500',
 };
 
+const priorityLabels: Record<string, string> = {
+  low: 'کم',
+  normal: 'عادی',
+  high: 'زیاد',
+  urgent: 'فوری',
+};
+
+const priorityColors: Record<string, string> = {
+  low: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
+  normal: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  urgent: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
+
 export default function Repairs() {
   const { user, hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -48,17 +63,22 @@ export default function Repairs() {
   const [repairs, setRepairs] = useState<Repair[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [technicianFilter, setTechnicianFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [showForm, setShowForm] = useState(false);
   const [editRepair, setEditRepair] = useState<Repair | null>(null);
   const [printRepairId, setPrintRepairId] = useState<string | null>(null);
   const [printType, setPrintType] = useState<'receipt' | 'invoice'>('receipt');
   const [settled, setSettled] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'timeline'>('list');
   const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null);
+  const [showAdvancedStats, setShowAdvancedStats] = useState(false);
 
   useEffect(() => { loadRepairs(); }, []);
   const loadRepairs = () => setRepairs(db.getRepairs().reverse());
 
+  // فیلتر پیشرفته
   const filtered = repairs.filter(r => {
     const matchSearch = r.ticketNumber.includes(search) || 
                        r.customerName.toLowerCase().includes(search.toLowerCase()) || 
@@ -67,7 +87,25 @@ export default function Repairs() {
                        r.brand?.toLowerCase().includes(search.toLowerCase()) || 
                        r.model?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || r.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchPriority = priorityFilter === 'all' || r.priority === priorityFilter;
+    const matchTechnician = technicianFilter === 'all' || r.technicianName === technicianFilter;
+    
+    let matchDate = true;
+    if (dateFilter !== 'all') {
+      const repairDate = new Date(r.entryDate);
+      const now = new Date();
+      if (dateFilter === 'today') {
+        matchDate = repairDate.toDateString() === now.toDateString();
+      } else if (dateFilter === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        matchDate = repairDate >= weekAgo;
+      } else if (dateFilter === 'month') {
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        matchDate = repairDate >= monthAgo;
+      }
+    }
+    
+    return matchSearch && matchStatus && matchPriority && matchTechnician && matchDate;
   });
 
   const openNew = () => {
@@ -219,20 +257,44 @@ export default function Repairs() {
     loadRepairs();
   };
 
-  // Stats
-  const totalRepairs = repairs.length;
-  const openRepairs = repairs.filter(r => !['delivered', 'cancelled', 'not_repairable'].includes(r.status)).length;
-  const readyForDelivery = repairs.filter(r => r.status === 'ready_for_delivery').length;
-  const totalRevenue = repairs.filter(r => r.status === 'delivered').reduce((sum, r) => sum + (r.finalTotal || r.totalCost || 0), 0);
+  // آمار پیشرفته
+  const stats = {
+    total: repairs.length,
+    open: repairs.filter(r => !['delivered', 'cancelled', 'not_repairable'].includes(r.status)).length,
+    ready: repairs.filter(r => r.status === 'ready_for_delivery').length,
+    delivered: repairs.filter(r => r.status === 'delivered').length,
+    revenue: repairs.filter(r => r.status === 'delivered').reduce((sum, r) => sum + (r.finalTotal || r.totalCost || 0), 0),
+    urgent: repairs.filter(r => r.priority === 'urgent' && !['delivered', 'cancelled'].includes(r.status)).length,
+    overdue: repairs.filter(r => {
+      if (['delivered', 'cancelled'].includes(r.status)) return false;
+      const daysSinceEntry = (Date.now() - new Date(r.entryDate).getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceEntry > 7;
+    }).length,
+  };
+
+  // آمار تعمیرکاران
+  const technicianStats = repairs.reduce((acc, r) => {
+    if (!r.technicianName) return acc;
+    if (!acc[r.technicianName]) {
+      acc[r.technicianName] = { count: 0, revenue: 0 };
+    }
+    acc[r.technicianName].count++;
+    if (r.status === 'delivered') {
+      acc[r.technicianName].revenue += r.finalTotal || r.totalCost || 0;
+    }
+    return acc;
+  }, {} as Record<string, { count: number; revenue: number }>);
+
+  const technicians = Object.keys(technicianStats);
 
   // Kanban columns
   const kanbanColumns = [
-    { status: 'received', label: 'دریافت شد', color: 'bg-blue-500' },
-    { status: 'diagnosing', label: 'در حال عیب‌یابی', color: 'bg-purple-500' },
-    { status: 'repairing', label: 'در حال تعمیر', color: 'bg-indigo-500' },
-    { status: 'waiting_part', label: 'منتظر قطعه', color: 'bg-yellow-500' },
-    { status: 'ready_for_delivery', label: 'آماده تحویل', color: 'bg-emerald-500' },
-    { status: 'delivered', label: 'تحویل شد', color: 'bg-slate-500' },
+    { status: 'received', label: 'دریافت شد', color: 'bg-blue-500', icon: Clock },
+    { status: 'diagnosing', label: 'عیب‌یابی', color: 'bg-purple-500', icon: Search },
+    { status: 'repairing', label: 'در حال تعمیر', color: 'bg-indigo-500', icon: Wrench },
+    { status: 'waiting_part', label: 'منتظر قطعه', color: 'bg-yellow-500', icon: AlertCircle },
+    { status: 'ready_for_delivery', label: 'آماده تحویل', color: 'bg-emerald-500', icon: CheckCircle },
+    { status: 'delivered', label: 'تحویل شد', color: 'bg-slate-500', icon: CheckCircle },
   ];
 
   return (
@@ -240,8 +302,8 @@ export default function Repairs() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">تعمیرات</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">مدیریت پذیرش و تعمیرات دستگاه‌ها</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">مدیریت تعمیرات</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">سیستم حرفه‌ای پذیرش و پیگیری تعمیرات</p>
         </div>
         <div className="flex gap-2">
           <div className="hidden md:flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
@@ -261,6 +323,14 @@ export default function Repairs() {
             >
               کانبان
             </button>
+            <button 
+              onClick={() => setViewMode('timeline')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'timeline' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              تایم‌لاین
+            </button>
           </div>
           {hasPermission('repairs.create') && (
             <Button variant="primary" onClick={openNew}>
@@ -271,62 +341,105 @@ export default function Repairs() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card p-5">
+      {/* Stats Dashboard */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <div className="card p-4 hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
-              <Wrench size={24} className="text-white" />
+            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+              <Wrench size={20} className="text-white" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">کل تعمیرات</p>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalRepairs}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">کل</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
             </div>
           </div>
         </div>
-        <div className="card p-5">
+        <div className="card p-4 hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center">
-              <Clock size={24} className="text-white" />
+            <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+              <Clock size={20} className="text-white" />
             </div>
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400">باز</p>
-              <p className="text-2xl font-bold text-amber-600">{openRepairs}</p>
+              <p className="text-xl font-bold text-amber-600">{stats.open}</p>
             </div>
           </div>
         </div>
-        <div className="card p-5">
+        <div className="card p-4 hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
-              <CheckCircle size={24} className="text-white" />
+            <div className="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+              <CheckCircle size={20} className="text-white" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">آماده تحویل</p>
-              <p className="text-2xl font-bold text-green-600">{readyForDelivery}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">آماده</p>
+              <p className="text-xl font-bold text-emerald-600">{stats.ready}</p>
             </div>
           </div>
         </div>
-        <div className="card p-5">
+        <div className="card p-4 hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
-              <DollarSign size={24} className="text-white" />
+            <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+              <Award size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">تحویل</p>
+              <p className="text-xl font-bold text-green-600">{stats.delivered}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 hover:shadow-lg transition-shadow">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+              <Zap size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">فوری</p>
+              <p className="text-xl font-bold text-red-600">{stats.urgent}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 hover:shadow-lg transition-shadow">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+              <AlertCircle size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 dark:text-slate-400"> overdue</p>
+              <p className="text-xl font-bold text-orange-600">{stats.overdue}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 hover:shadow-lg transition-shadow">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+              <DollarSign size={20} className="text-white" />
             </div>
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400">درآمد</p>
-              <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalRevenue, settings.currency)}</p>
+              <p className="text-lg font-bold text-emerald-600">{formatCurrency(stats.revenue, settings.currency)}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Advanced Filters */}
       <div className="card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter size={20} className="text-slate-500" />
-          <h3 className="font-bold text-slate-900 dark:text-white">جستجو و فیلتر</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Filter size={20} className="text-slate-500" />
+            <h3 className="font-bold text-slate-900 dark:text-white">فیلترهای پیشرفته</h3>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setShowAdvancedStats(!showAdvancedStats)}
+          >
+            <BarChart3 size={16} />
+            آمار تعمیرکاران
+          </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="relative">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="relative lg:col-span-2">
             <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
@@ -346,8 +459,57 @@ export default function Repairs() {
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
+          <select 
+            value={priorityFilter} 
+            onChange={e => setPriorityFilter(e.target.value)}
+            className="input"
+          >
+            <option value="all">همه اولویت‌ها</option>
+            {Object.entries(priorityLabels).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+          <select 
+            value={dateFilter} 
+            onChange={e => setDateFilter(e.target.value as any)}
+            className="input"
+          >
+            <option value="all">همه تاریخ‌ها</option>
+            <option value="today">امروز</option>
+            <option value="week">هفته اخیر</option>
+            <option value="month">ماه اخیر</option>
+          </select>
         </div>
       </div>
+
+      {/* Technician Stats */}
+      {showAdvancedStats && technicians.length > 0 && (
+        <div className="card p-5">
+          <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <PieChart size={20} className="text-blue-500" />
+            آمار تعمیرکاران
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(technicianStats).map(([name, data]) => (
+              <div key={name} className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold">
+                    {name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white">{name}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{data.count} تعمیر</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">درآمد:</span>
+                  <span className="font-bold text-green-600">{formatCurrency(data.revenue, settings.currency)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* List View */}
       {viewMode === 'list' && (
@@ -358,14 +520,19 @@ export default function Repairs() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
                     <div className={`w-1 h-12 rounded-full ${statusColors[r.status]}`}></div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <p className="font-bold text-lg text-slate-900 dark:text-white">
                           #{r.ticketNumber}
                         </p>
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${statusColors[r.status]}`}>
                           {statusLabels[r.status]}
                         </span>
+                        {(r as any).priority && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${priorityColors[(r as any).priority]}`}>
+                            {priorityLabels[(r as any).priority]}
+                          </span>
+                        )}
                         {(r.remaining || 0) === 0 && r.status === 'delivered' && (
                           <span className="badge badge-success">تسویه ✓</span>
                         )}
@@ -471,11 +638,14 @@ export default function Repairs() {
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 overflow-x-auto pb-4">
           {kanbanColumns.map(col => {
             const columnRepairs = filtered.filter(r => r.status === col.status);
+            const Icon = col.icon;
             return (
               <div key={col.status} className="bg-slate-100 dark:bg-slate-800 rounded-xl p-3 min-w-[280px]">
                 <div className="flex items-center justify-between mb-3 px-2">
                   <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${col.color}`}></div>
+                    <div className={`w-8 h-8 ${col.color} rounded-lg flex items-center justify-center`}>
+                      <Icon size={16} className="text-white" />
+                    </div>
                     <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300">{col.label}</h3>
                   </div>
                   <span className="badge badge-info text-xs">{columnRepairs.length}</span>
@@ -510,6 +680,37 @@ export default function Repairs() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Timeline View */}
+      {viewMode === 'timeline' && (
+        <div className="card p-5">
+          <h3 className="font-bold text-slate-900 dark:text-white mb-4">تایم‌لاین تعمیرات</h3>
+          <div className="space-y-4">
+            {filtered.map(r => (
+              <div key={r.id} className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div className={`w-3 h-3 rounded-full ${statusColors[r.status]}`}></div>
+                  <div className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700"></div>
+                </div>
+                <div className="flex-1 pb-4">
+                  <div className="card p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-bold text-slate-900 dark:text-white">#{r.ticketNumber}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{r.customerName} - {r.brand} {r.model}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${statusColors[r.status]}`}>
+                        {statusLabels[r.status]}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{toJalali(r.entryDate)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

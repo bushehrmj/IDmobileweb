@@ -255,6 +255,9 @@ export interface Repair {
   entryTime: string;
   history?: RepairHistoryEntry[];
   
+  // اولویت
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  
   notes: string;
   createdAt: string;
   updatedAt?: string;
