@@ -47,6 +47,12 @@ export interface Product {
   stock: number;
   status: 'active' | 'inactive';
   dollarRateAtPurchase?: number;
+  // فیلدهای جدید برای سیستم انبار حرفه‌ای
+  averageBuyPrice?: number; // میانگین بهای خرید (Weighted Average)
+  lastBuyPrice?: number; // آخرین قیمت خرید
+  totalPurchaseValue?: number; // ارزش کل خریدها
+  totalPurchaseQuantity?: number; // تعداد کل خریدها
+  suggestedPurchaseQuantity?: number; // مقدار پیشنهادی خرید
   createdAt: string;
   updatedAt: string;
 }
@@ -407,15 +413,20 @@ export interface StockMovement {
   id: string;
   productId: string;
   productName: string;
-  type: 'in' | 'out' | 'adjustment' | 'return' | 'repair';
+  type: 'in' | 'out' | 'adjustment' | 'return' | 'repair' | 'damage' | 'transfer';
   quantity: number;
   reference: string;
-  referenceType: 'purchase' | 'sale' | 'repair' | 'adjustment' | 'return';
+  referenceType: 'purchase' | 'sale' | 'repair' | 'adjustment' | 'return' | 'damage' | 'transfer';
   referenceId: string;
   userId: string;
   userName: string;
   date: string;
   notes: string;
+  // فیلدهای جدید برای ردیابی کامل
+  previousStock?: number; // موجودی قبل از عملیات
+  newStock?: number; // موجودی بعد از عملیات
+  unitPrice?: number; // قیمت واحد در زمان عملیات
+  totalPrice?: number; // قیمت کل در زمان عملیات
 }
 
 export interface Payment {
@@ -722,6 +733,171 @@ export function getRolePages(role: string): string[] {
     case 'warehouse': return ['dashboard', 'products', 'inventory', 'purchases'];
     default: return ['dashboard'];
   }
+}
+
+// ============================================
+// Inventory Helper Functions
+// ============================================
+
+/**
+ * محاسبه میانگین بهای خرید (Weighted Average Cost)
+ */
+export function calculateAverageBuyPrice(productId: string): number {
+  const movements = getCollection<StockMovement>('stock_movements')
+    .filter(m => m.productId === productId && m.type === 'in' && m.unitPrice);
+  
+  if (movements.length === 0) {
+    const product = getCollection<Product>('products').find(p => p.id === productId);
+    return product?.buyPrice || 0;
+  }
+
+  let totalCost = 0;
+  let totalQuantity = 0;
+
+  movements.forEach(m => {
+    totalCost += (m.unitPrice || 0) * m.quantity;
+    totalQuantity += m.quantity;
+  });
+
+  return totalQuantity > 0 ? totalCost / totalQuantity : 0;
+}
+
+/**
+ * به‌روزرسانی میانگین بهای خرید محصول
+ */
+export function updateProductAveragePrice(productId: string): void {
+  const products = getCollection<Product>('products');
+  const product = products.find(p => p.id === productId);
+  
+  if (product) {
+    product.averageBuyPrice = calculateAverageBuyPrice(productId);
+    product.totalPurchaseValue = product.averageBuyPrice * product.stock;
+    
+    // محاسبه مقدار پیشنهادی خرید
+    if (product.stock < product.minStock) {
+      product.suggestedPurchaseQuantity = product.minStock * 2 - product.stock;
+    } else {
+      product.suggestedPurchaseQuantity = 0;
+    }
+    
+    const idx = products.findIndex(p => p.id === productId);
+    products[idx] = product;
+    setCollection('products', products);
+  }
+}
+
+/**
+ * ثبت حرکت انبار با اطلاعات کامل
+ */
+export function recordStockMovement(
+  productId: string,
+  productName: string,
+  type: StockMovement['type'],
+  quantity: number,
+  reference: string,
+  referenceType: StockMovement['referenceType'],
+  referenceId: string,
+  userId: string,
+  userName: string,
+  notes: string = '',
+  unitPrice?: number
+): StockMovement {
+  const products = getCollection<Product>('products');
+  const product = products.find(p => p.id === productId);
+  
+  if (!product) {
+    throw new Error('Product not found');
+  }
+
+  const previousStock = product.stock;
+  let newStock = previousStock;
+
+  // محاسبه موجودی جدید
+  if (type === 'in' || type === 'return') {
+    newStock = previousStock + quantity;
+  } else if (type === 'out' || type === 'repair' || type === 'damage') {
+    newStock = previousStock - quantity;
+    if (newStock < 0) {
+      throw new Error('Insufficient stock');
+    }
+  } else if (type === 'adjustment') {
+    newStock = quantity; // quantity در این حالت موجودی جدید است
+    quantity = newStock - previousStock;
+  }
+
+  // به‌روزرسانی موجودی محصول
+  product.stock = newStock;
+  product.updatedAt = new Date().toISOString();
+  
+  // به‌روزرسانی آخرین قیمت خرید
+  if (type === 'in' && unitPrice) {
+    product.lastBuyPrice = unitPrice;
+    product.totalPurchaseQuantity = (product.totalPurchaseQuantity || 0) + Math.abs(quantity);
+  }
+  
+  const idx = products.findIndex(p => p.id === productId);
+  products[idx] = product;
+  setCollection('products', products);
+
+  // ثبت حرکت انبار
+  const movement: StockMovement = {
+    id: uuidv4(),
+    productId,
+    productName,
+    type,
+    quantity: Math.abs(quantity),
+    reference,
+    referenceType,
+    referenceId,
+    userId,
+    userName,
+    date: new Date().toISOString(),
+    notes,
+    previousStock,
+    newStock,
+    unitPrice: unitPrice || product.buyPrice,
+    totalPrice: (unitPrice || product.buyPrice) * Math.abs(quantity),
+  };
+
+  const movements = getCollection<StockMovement>('stock_movements');
+  movements.push(movement);
+  setCollection('stock_movements', movements);
+
+  // به‌روزرسانی میانگین بهای خرید
+  if (type === 'in') {
+    updateProductAveragePrice(productId);
+  }
+
+  return movement;
+}
+
+/**
+ * دریافت وضعیت موجودی محصول
+ */
+export function getStockStatus(product: Product): 'out' | 'low' | 'ok' {
+  if (product.stock === 0) return 'out';
+  if (product.stock <= product.minStock) return 'low';
+  return 'ok';
+}
+
+/**
+ * دریافت تاریخچه گردش کالای خاص
+ */
+export function getProductMovementHistory(productId: string): StockMovement[] {
+  return getCollection<StockMovement>('stock_movements')
+    .filter(m => m.productId === productId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+/**
+ * محاسبه ارزش کل موجودی
+ */
+export function calculateTotalInventoryValue(): number {
+  const products = getCollection<Product>('products');
+  return products.reduce((sum, p) => {
+    const avgPrice = p.averageBuyPrice || p.buyPrice;
+    return sum + (avgPrice * p.stock);
+  }, 0);
 }
 
 // DB Operations
