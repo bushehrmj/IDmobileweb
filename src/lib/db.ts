@@ -1103,4 +1103,12 @@ export const db = {
     }, settings.repairStartNumber - 1);
     return String(maxNum + 1);
   },
+
+  // Inventory Helper Functions
+  calculateAverageBuyPrice,
+  updateProductAveragePrice,
+  recordStockMovement,
+  getStockStatus,
+  getProductMovementHistory,
+  calculateTotalInventoryValue,
 };
