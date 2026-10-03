@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Users, Package, Warehouse,
   Truck, Wrench, CreditCard, BarChart3, UserCog, Settings as SettingsIcon,
   Database, LogOut, Menu, X, Search, Bell, Moon, Sun, ChevronDown, ChevronLeft,
-  DollarSign, BookOpen, ArrowRightLeft, FileText, Wallet, PieChart, Plus
+  DollarSign, BookOpen, ArrowRightLeft, FileText, Wallet, PieChart, Plus, User
 } from 'lucide-react';
 import GlobalSearch from './GlobalSearch';
 import QuickActions from './QuickActions';
@@ -218,6 +218,9 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
                   <p className="text-xs font-medium truncate">{user?.fullName}</p>
                   <p className="text-[10px] text-slate-500">{user?.role === 'admin' ? 'مدیر' : user?.role === 'manager' ? 'مدیر فروشگاه' : user?.role === 'seller' ? 'فروشنده' : user?.role === 'technician' ? 'تعمیرکار' : 'انباردار'}</p>
                 </div>
+                <button onClick={() => onNavigate('profile')} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded" title="پروفایل">
+                  <User size={16} />
+                </button>
                 <button onClick={logout} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded" title="خروج">
                   <LogOut size={16} />
                 </button>

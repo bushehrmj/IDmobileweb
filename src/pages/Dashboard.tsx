@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, formatCurrency, toJalali } from '../lib/auth';
 import { db } from '../lib/db';
+import { financialDb } from '../lib/financialDb';
+import { 
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts';
 import { 
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, 
-  Users, Package, Wrench, AlertTriangle, ArrowUpRight, ArrowDownRight,
-  Calendar, Clock
+  Users, Package, Wrench, AlertTriangle, Calendar, Clock,
+  ArrowUpRight, ArrowDownRight, Activity
 } from 'lucide-react';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<any>({});
+  const [chartData, setChartData] = useState<any[]>([]);
   const [recentSales, setRecentSales] = useState<any[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
   const [pendingRepairs, setPendingRepairs] = useState<any[]>([]);
@@ -50,6 +55,28 @@ export default function Dashboard() {
       customerDebts,
       totalSales: sales.length,
     });
+
+    // Chart data - last 7 days
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toDateString();
+      const daySales = sales.filter(s => new Date(s.date).toDateString() === dateStr);
+      const revenue = daySales.reduce((sum, s) => sum + s.total, 0);
+      const profit = daySales.reduce((sum, sale) => {
+        return sum + sale.items.reduce((itemSum, item) => {
+          return itemSum + ((item.sellPrice - item.buyPrice) * item.quantity);
+        }, 0);
+      }, 0);
+      
+      last7Days.push({
+        date: date.toLocaleDateString('fa-IR', { weekday: 'short' }),
+        revenue: revenue / 1000000, // Convert to millions
+        profit: profit / 1000000,
+      });
+    }
+    setChartData(last7Days);
 
     setRecentSales(sales.slice(-5).reverse());
     setLowStockProducts(lowStock.slice(0, 5));
@@ -94,7 +121,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Welcome */}
-      <div className="bg-gradient-to-l from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
+      <div className="bg-gradient-to-l from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
         <h1 className="text-2xl font-bold mb-2">
           خوش آمدید، {user?.fullName} 👋
         </h1>
@@ -136,6 +163,53 @@ export default function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Chart */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Activity size={20} className="text-blue-500" />
+            عملکرد 7 روز گذشته
+          </h3>
+        </div>
+        {chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="date" stroke="#64748b" />
+              <YAxis stroke="#64748b" />
+              <Tooltip 
+                formatter={(value: number) => value.toFixed(2) + ' میلیون تومان'}
+                contentStyle={{ 
+                  direction: 'rtl',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0'
+                }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="revenue" 
+                stroke="#3b82f6" 
+                strokeWidth={3}
+                name="فروش"
+                dot={{ fill: '#3b82f6', r: 5 }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="profit" 
+                stroke="#10b981" 
+                strokeWidth={3}
+                name="سود"
+                dot={{ fill: '#10b981', r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-[300px] flex items-center justify-center text-slate-500">
+            داده‌ای برای نمایش وجود ندارد
+          </div>
+        )}
       </div>
 
       {/* Alerts */}
