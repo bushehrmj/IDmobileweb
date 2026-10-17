@@ -1,0 +1,339 @@
+@import "tailwindcss";
+
+@theme {
+  --font-vazir: 'Vazirmatn', Tahoma, Arial, sans-serif;
+}
+
+* {
+  font-family: 'Vazirmatn', Tahoma, Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+body {
+  direction: rtl;
+  background-color: #f8fafc;
+  color: #0f172a;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.dark body {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Card */
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.dark .card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+/* Button */
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #059669;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid #2563eb;
+  color: #2563eb;
+}
+
+.btn-outline:hover {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #64748b;
+}
+
+.btn-ghost:hover {
+  background: #f1f5f9;
+}
+
+.dark .btn-ghost:hover {
+  background: #334155;
+}
+
+/* Input */
+.input {
+  width: 100%;
+  padding: 10px 14px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.dark .input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+.input:focus {
+  border-color: #2563eb;
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.dark .badge-success {
+  background: #064e3b;
+  color: #a7f3d0;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dark .badge-warning {
+  background: #78350f;
+  color: #fde68a;
+}
+
+.badge-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dark .badge-error {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+.badge-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.dark .badge-info {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+/* Table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dark .table {
+  background: #1e293b;
+}
+
+.table thead {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.dark .table thead {
+  background: #0f172a;
+  border-bottom-color: #334155;
+}
+
+.table th {
+  padding: 12px 16px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.dark .table th {
+  color: #94a3b8;
+}
+
+.table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.dark .table td {
+  color: #e2e8f0;
+  border-bottom-color: #334155;
+}
+
+.table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.dark .table tbody tr:hover {
+  background: #0f172a;
+}
+
+/* Print */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+  }
+  
+  @page {
+    margin: 10mm;
+  }
+}
+
+/* Invoice sizes */
+.invoice-80mm {
+  width: 80mm;
+  padding: 3mm;
+  font-size: 11px;
+}
+
+.invoice-a5 {
+  width: 148mm;
+  padding: 10mm;
+}
+
+.invoice-a4 {
+  width: 210mm;
+  padding: 15mm;
+}
+
+/* Focus */
+*:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: #2563eb;
+  color: white;
+}
+
+/* Print Two Copies for Repair Receipt */
+.print-two-copies {
+  background: white;
+}
+
+.receipt-copy {
+  page-break-inside: avoid;
+}
+
+@media print {
+  .print-two-copies {
+    width: 100%;
+  }
+  
+  .receipt-copy {
+    page-break-inside: avoid;
+    margin-bottom: 10mm;
+  }
+  
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}
