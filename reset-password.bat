@@ -7,11 +7,11 @@ echo ==========================================================
 echo    ID Mobile Manager Pro - Password Reset
 echo ==========================================================
 echo.
-echo    Opening password reset tool in browser...
+echo    Opening password reset tool...
 echo.
 
 REM Open the reset password HTML file in default browser
-start "" "reset-password.html"
+start "" "%~dp0reset-password.html"
 
 echo [OK] Password reset tool opened in your browser
 echo.
@@ -19,12 +19,13 @@ echo ==========================================================
 echo    Instructions:
 echo ==========================================================
 echo.
-echo    1. Enter new password in the form
-echo    2. Confirm the password
-echo    3. Click "Reset Password" button
-echo    4. Login with new password at http://localhost:3000
+echo    1. The tool will initialize the database automatically
+echo    2. Enter your new password (minimum 6 characters)
+echo    3. Confirm the password
+echo    4. Click "Reset Password" button
+echo    5. Login at http://localhost:3000 with new password
 echo.
 echo ==========================================================
 echo.
 
-pause
+timeout /t 5 /nobreak >nul
