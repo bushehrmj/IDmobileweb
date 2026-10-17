@@ -1,127 +1,121 @@
 @echo off
-chcp 65001 >nul
-title ID Mobile Manager Pro - نسخه Portable
+title ID Mobile Manager Pro - Portable
 color 0B
 
 echo.
-echo ╔═══════════════════════════════════════════════════════════╗
-echo ║                                                           ║
-echo ║         📦 ID Mobile Manager Pro - Portable              ║
-echo ║                                                           ║
-echo ║         نسخه قابل حمل بدون نیاز به نصب                   ║
-echo ║                                                           ║
-echo ╚═══════════════════════════════════════════════════════════╝
+echo ==========================================================
+echo    ID Mobile Manager Pro - Portable Version
+echo ==========================================================
 echo.
 
-REM بررسی وجود Node.js
+REM Check Node.js
 where node >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
     color 0E
-    echo ⚠️  Node.js نصب نیست!
+    echo [WARNING] Node.js not found!
     echo.
-    echo ═══════════════════════════════════════════════════════════
-    echo 📥 دانلود Node.js Portable
-    echo ═══════════════════════════════════════════════════════════
+    echo ==========================================================
+    echo    Downloading Node.js Portable
+    echo ==========================================================
     echo.
-    echo در حال دانلود Node.js...
+    echo Downloading Node.js...
     echo.
     
-    REM دانلود Node.js portable
-    powershell -Command "& {Invoke-WebRequest -Uri 'https://nodejs.org/dist/v20.10.0/node-v20.10.0-win-x64.zip' -OutFile 'node.zip'}"
+    REM Download Node.js portable
+    powershell -Command "& {[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://nodejs.org/dist/v20.10.0/node-v20.10.0-win-x64.zip' -OutFile 'node.zip'}"
     
     if %ERRORLEVEL% NEQ 0 (
         color 0C
-        echo ❌ خطا در دانلود Node.js!
+        echo [ERROR] Failed to download Node.js!
         echo.
-        echo لطفاً Node.js را به صورت دستی دانلود و نصب کنید:
-        echo https://nodejs.org/
+        echo Please download manually from: https://nodejs.org/
         echo.
         pause
         exit /b 1
     )
     
-    echo ✅ دانلود کامل شد
+    echo [OK] Download completed
     echo.
-    echo در حال استخراج...
+    echo Extracting...
     
-    REM استخراج فایل
+    REM Extract files
     powershell -Command "& {Expand-Archive -Path 'node.zip' -DestinationPath '.' -Force}"
     
     if %ERRORLEVEL% NEQ 0 (
         color 0C
-        echo ❌ خطا در استخراج!
+        echo [ERROR] Failed to extract!
         pause
         exit /b 1
     )
     
-    echo ✅ استخراج کامل شد
+    echo [OK] Extraction completed
     echo.
     
-    REM تغییر نام پوشه
+    REM Rename folder
     if exist "node-v20.10.0-win-x64" (
         ren "node-v20.10.0-win-x64" "node"
     )
     
-    REM حذف فایل zip
+    REM Delete zip file
     del node.zip
     
-    echo ✅ Node.js portable آماده است
+    echo [OK] Node.js portable ready
     echo.
     
-    REM تنظیم PATH
+    REM Set PATH
     set PATH=%CD%\node;%PATH%
 )
 
-echo ✅ Node.js آماده است
+echo [OK] Node.js ready
 node --version
 echo.
 
-REM بررسی نصب بودن برنامه
+REM Check if dependencies installed
 if not exist "node_modules" (
-    echo ═══════════════════════════════════════════════════════════
-    echo 📦 نصب وابستگی‌ها
-    echo ═══════════════════════════════════════════════════════════
+    echo ==========================================================
+    echo    Installing dependencies...
+    echo ==========================================================
     echo.
     
     call npm install
     
     if %ERRORLEVEL% NEQ 0 (
         color 0C
-        echo ❌ خطا در نصب وابستگی‌ها!
+        echo [ERROR] Failed to install dependencies!
         pause
         exit /b 1
     )
     
-    echo ✅ نصب کامل شد
+    echo [OK] Installation completed
     echo.
 )
 
-REM بررسی build
+REM Check if built
 if not exist "dist" (
-    echo ═══════════════════════════════════════════════════════════
-    echo 🔨 ساخت برنامه
-    echo ═══════════════════════════════════════════════════════════
+    echo ==========================================================
+    echo    Building project...
+    echo ==========================================================
     echo.
     
     call npm run build
     
     if %ERRORLEVEL% NEQ 0 (
         color 0C
-        echo ❌ خطا در ساخت برنامه!
+        echo [ERROR] Failed to build!
         pause
         exit /b 1
     )
     
-    echo ✅ ساخت کامل شد
+    echo [OK] Build completed
     echo.
 )
 
-echo ═══════════════════════════════════════════════════════════
-echo 🚀 اجرای برنامه
-echo ═══════════════════════════════════════════════════════════
+echo ==========================================================
+echo    Starting server...
+echo ==========================================================
 echo.
 
-REM دریافت IP سیستم
+REM Get IP address
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
     set IP=%%a
     goto :found
@@ -129,28 +123,28 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
 :found
 set IP=%IP: =%
 
-echo 🌐 آدرس‌های دسترسی:
+echo [OK] Server addresses:
 echo.
-echo    📍 از این کامپیوتر:
+echo    From this computer:
 echo       http://localhost:3000
 echo.
-echo    📱 از موبایل/تبلت در شبکه محلی:
+echo    From mobile/tablet on same WiFi:
 echo       http://%IP%:3000
 echo.
-echo ═══════════════════════════════════════════════════════════
+echo ==========================================================
 echo.
-echo 🔐 اطلاعات ورود:
+echo    Login information:
 echo.
-echo    👤 نام کاربری: admin
-echo    🔑 رمز عبور: admin123
+echo       Username: admin
+echo       Password: admin123
 echo.
-echo ═══════════════════════════════════════════════════════════
+echo ==========================================================
 echo.
 
-REM باز کردن مرورگر بعد از 3 ثانیه
+REM Open browser after 3 seconds
 start /b cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:3000"
 
-REM اجرای سرور
+REM Start server
 node server.js
 
 pause

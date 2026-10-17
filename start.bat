@@ -1,81 +1,52 @@
 @echo off
-chcp 65001 >nul
-title ID Mobile Manager Pro - در حال اجرا
+title Start ID Mobile Manager Pro
 color 0B
 
 echo.
-echo ╔═══════════════════════════════════════════════════════════╗
-echo ║                                                           ║
-echo ║         🚀 ID Mobile Manager Pro                         ║
-echo ║                                                           ║
-echo ║         سیستم مدیریت فروشگاه موبایل                      ║
-echo ║                                                           ║
-echo ╚═══════════════════════════════════════════════════════════╝
+echo ==========================================================
+echo    ID Mobile Manager Pro - Starting Server
+echo ==========================================================
 echo.
 
-REM بررسی نصب بودن برنامه
+REM Check if node_modules exists
 if not exist "node_modules" (
     color 0E
-    echo ⚠️  برنامه هنوز نصب نشده است!
+    echo [WARNING] Dependencies not installed!
     echo.
-    echo لطفاً ابتدا فایل setup.bat را اجرا کنید.
+    echo Please run setup.bat first.
     echo.
     pause
     exit /b 1
 )
 
-REM بررسی build
+REM Check if dist exists
 if not exist "dist" (
     color 0E
-    echo ⚠️  برنامه هنوز build نشده است!
+    echo [WARNING] Project not built!
     echo.
-    echo لطفاً ابتدا فایل setup.bat را اجرا کنید.
+    echo Please run setup.bat first.
     echo.
     pause
     exit /b 1
 )
 
-echo ✅ برنامه آماده اجرا است
+echo [OK] Starting server on port 3000...
 echo.
-echo ═══════════════════════════════════════════════════════════
-echo 📡 در حال راه‌اندازی سرور...
-echo ═══════════════════════════════════════════════════════════
+echo ==========================================================
+echo    Server is running!
+echo ==========================================================
 echo.
-
-REM دریافت IP سیستم
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-    set IP=%%a
-    goto :found
-)
-:found
-set IP=%IP: =%
-
-echo 🌐 آدرس‌های دسترسی:
+echo    Open in browser:
+echo      http://localhost:3000
 echo.
-echo    📍 از این کامپیوتر:
-echo       http://localhost:3000
+echo    Default login:
+echo      Username: admin
+echo      Password: admin123
 echo.
-echo    📱 از موبایل/تبلت در شبکه محلی:
-echo       http://%IP%:3000
-echo.
-echo ═══════════════════════════════════════════════════════════
-echo.
-echo 🔐 اطلاعات ورود:
-echo.
-echo    👤 نام کاربری: admin
-echo    🔑 رمز عبور: admin123
-echo.
-echo ═══════════════════════════════════════════════════════════
-echo.
-echo ⚠️  برای توقف سرور، این پنجره را ببندید یا Ctrl+C را بزنید
-echo.
-echo ═══════════════════════════════════════════════════════════
+echo    Press Ctrl+C to stop the server
+echo ==========================================================
 echo.
 
-REM باز کردن مرورگر بعد از 3 ثانیه
-start /b cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:3000"
-
-REM اجرای سرور
 node server.js
 
 pause

@@ -1,77 +1,71 @@
 @echo off
-chcp 65001 >nul
-title بازیابی پشتیبان ID Mobile Manager Pro
+title Restore ID Mobile Manager Pro
 color 0E
 
 echo.
-echo ╔═══════════════════════════════════════════════════════════╗
-echo ║                                                           ║
-echo ║         🔄 بازیابی از پشتیبان                             ║
-echo ║                                                           ║
-echo ╚═══════════════════════════════════════════════════════════╝
+echo ==========================================================
+echo    ID Mobile Manager Pro - Restore
+echo ==========================================================
 echo.
 
-REM بررسی وجود پوشه backup
+REM Check backup directory
 if not exist "backup" (
     color 0C
-    echo ❌ پوشه backup وجود ندارد!
+    echo [ERROR] Backup directory not found!
     echo.
     pause
     exit /b 1
 )
 
-REM لیست فایل‌های پشتیبان
-echo 📂 فایل‌های پشتیبان موجود:
+REM List backup files
+echo [INFO] Available backup files:
 echo.
-dir /b backup\*.json 2>nul | findstr /n "." || echo    هیچ فایلی یافت نشد
+dir /b backup\*.json 2>nul | findstr /n "." || echo    No files found
 echo.
 
-REM درخواست نام فایل
-set /p FILENAME="نام فایل پشتیبان را وارد کنید (با پسوند .json): "
+REM Request filename
+set /p FILENAME="Enter backup filename (with .json): "
 
 if not exist "backup\%FILENAME%" (
     color 0C
     echo.
-    echo ❌ فایل یافت نشد: backup\%FILENAME%
+    echo [ERROR] File not found: backup\%FILENAME%
     echo.
     pause
     exit /b 1
 )
 
 echo.
-echo ⚠️  هشدار: این عملیات تمام داده‌های فعلی را بازنویسی می‌کند!
+echo [WARNING] This will overwrite all current data!
 echo.
-set /p CONFIRM="آیا مطمئن هستید؟ (y/n): "
+set /p CONFIRM="Are you sure? (y/n): "
 
 if /i not "%CONFIRM%"=="y" (
     echo.
-    echo عملیات لغو شد.
+    echo Operation cancelled.
     pause
     exit /b 0
 )
 
 echo.
-echo 🔄 در حال بازیابی...
+echo [INFO] Restoring data...
 echo.
 
-REM اجرای script بازیابی
-node -e "const fs = require('fs'); const data = JSON.parse(fs.readFileSync('backup/%FILENAME%', 'utf8')); if (!fs.existsSync('data')) fs.mkdirSync('data'); Object.keys(data).forEach(key => { fs.writeFileSync('data/' + key + '.json', JSON.stringify(data[key], null, 2)); }); console.log('✅ بازیابی با موفقیت انجام شد');"
+REM Import data using Node.js
+node -e "const fs=require('fs');const data=JSON.parse(fs.readFileSync('backup/%FILENAME%','utf8'));if(!fs.existsSync('data'))fs.mkdirSync('data');Object.keys(data).forEach(key=>{fs.writeFileSync('data/'+key+'.json',JSON.stringify(data[key],null,2))});console.log('[OK] Data restored successfully');"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
-    echo ╔═══════════════════════════════════════════════════════════╗
-    echo ║                                                           ║
-    echo ║              ✅ بازیابی موفق                              ║
-    echo ║                                                           ║
-    echo ║   داده‌ها با موفقیت بازیابی شدند                        ║
-    echo ║                                                           ║
-    echo ║   لطفاً برنامه را مجدداً اجرا کنید                      ║
-    echo ║                                                           ║
-    echo ╚═══════════════════════════════════════════════════════════╝
+    echo ==========================================================
+    echo    [OK] Restore completed successfully!
+    echo ==========================================================
+    echo.
+    echo    Please restart the application.
+    echo.
 ) else (
     color 0C
     echo.
-    echo ❌ خطا در بازیابی!
+    echo [ERROR] Failed to restore data!
 )
 
 echo.

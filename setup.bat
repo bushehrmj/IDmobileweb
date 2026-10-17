@@ -1,107 +1,67 @@
 @echo off
-chcp 65001 >nul
-title نصب ID Mobile Manager Pro
+title Install ID Mobile Manager Pro
 color 0A
 
 echo.
-echo ╔═══════════════════════════════════════════════════════════╗
-echo ║                                                           ║
-echo ║         نصب خودکار ID Mobile Manager Pro                 ║
-echo ║                                                           ║
-echo ╚═══════════════════════════════════════════════════════════╝
+echo ==========================================================
+echo    ID Mobile Manager Pro - Installation
+echo ==========================================================
 echo.
 
-REM بررسی Node.js
+REM Check Node.js
 where node >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
     color 0C
-    echo ❌ خطا: Node.js نصب نیست!
+    echo [ERROR] Node.js is not installed!
     echo.
-    echo لطفاً Node.js را از سایت رسمی دانلود و نصب کنید:
-    echo https://nodejs.org/
-    echo.
-    echo نسخه پیشنهادی: LTS (Long Term Support)
+    echo Please install Node.js from: https://nodejs.org/
     echo.
     pause
     exit /b 1
 )
 
-echo ✅ Node.js پیدا شد
+echo [OK] Node.js found
 node --version
 echo.
 
-REM بررسی npm
-where npm >nul 2>nul
-if %ERRORLEVEL% NEQ 0 (
-    color 0C
-    echo ❌ خطا: npm نصب نیست!
-    pause
-    exit /b 1
-)
-
-echo ✅ npm پیدا شد
-npm --version
+REM Install dependencies
+echo ==========================================================
+echo    Installing dependencies...
+echo ==========================================================
 echo.
-
-echo ═══════════════════════════════════════════════════════════
-echo 📦 در حال نصب وابستگی‌ها...
-echo ═══════════════════════════════════════════════════════════
-echo.
-
 call npm install
 
 if %ERRORLEVEL% NEQ 0 (
     color 0C
     echo.
-    echo ❌ خطا در نصب وابستگی‌ها!
-    echo.
-    echo لطفاً اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.
+    echo [ERROR] Failed to install dependencies!
     pause
     exit /b 1
 )
 
 echo.
-echo ═══════════════════════════════════════════════════════════
-echo 🔨 در حال ساخت برنامه...
-echo ═══════════════════════════════════════════════════════════
+echo ==========================================================
+echo    Building project...
+echo ==========================================================
 echo.
-
 call npm run build
 
 if %ERRORLEVEL% NEQ 0 (
     color 0C
     echo.
-    echo ❌ خطا در ساخت برنامه!
+    echo [ERROR] Failed to build project!
     pause
     exit /b 1
 )
 
 echo.
-echo ╔═══════════════════════════════════════════════════════════╗
-echo ║                                                           ║
-echo ║              ✅ نصب با موفقیت انجام شد!                  ║
-echo ║                                                           ║
-echo ║   برای اجرای برنامه، فایل start.bat را اجرا کنید        ║
-echo ║                                                           ║
-echo ╚═══════════════════════════════════════════════════════════╝
+echo ==========================================================
+echo    [OK] Installation completed successfully!
+echo ==========================================================
 echo.
-
-REM ایجاد میانبر روی دسکتاپ
-echo در حال ایجاد میانبر روی دسکتاپ...
-
-set SCRIPT="%TEMP%\CreateShortcut.vbs"
-echo Set oWS = WScript.CreateObject("WScript.Shell") > %SCRIPT%
-echo sLinkFile = oWS.SpecialFolders("Desktop") ^& "\ID Mobile Manager Pro.lnk" >> %SCRIPT%
-echo Set oLink = oWS.CreateShortcut(sLinkFile) >> %SCRIPT%
-echo oLink.TargetPath = "%~dp0start.bat" >> %SCRIPT%
-echo oLink.WorkingDirectory = "%~dp0" >> %SCRIPT%
-echo oLink.Description = "ID Mobile Manager Pro" >> %SCRIPT%
-echo oLink.Save >> %SCRIPT%
-
-cscript /nologo %SCRIPT%
-del %SCRIPT%
-
-echo ✅ میانبر روی دسکتاپ ایجاد شد
+echo    To run the program, double-click: start.bat
+echo.
+echo ==========================================================
 echo.
 
 pause
